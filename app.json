@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Iteka Ride Driver",
+    "slug": "iteka-ride-driver-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/iteka-ride-icon.png",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.iteka.driver"
+    },
+    "android": {
+      "package": "com.iteka.driver",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "web": {
+      "favicon": "./assets/iteka-ride-icon.png"
+    },
+    "plugins": ["expo-router", "expo-font"],
+    "scheme": "iteka-driver",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
