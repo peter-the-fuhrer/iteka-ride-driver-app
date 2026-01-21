@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Home, DollarSign, Clock, User } from "lucide-react-native";
+import { Platform } from "react-native";
 import { Colors } from "../../constants/Colors";
 
 export default function RootLayout() {
@@ -16,9 +17,9 @@ export default function RootLayout() {
           backgroundColor: "white",
           borderTopWidth: 1,
           borderTopColor: "#f3f4f6",
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: Platform.OS === "android" ? 70 : 90,
+          paddingBottom: Platform.OS === "android" ? 10 : 30,
+          paddingTop: 10,
         },
         tabBarLabelStyle: {
           fontFamily: "Poppins_600SemiBold",
@@ -60,6 +61,36 @@ export default function RootLayout() {
         name="active-ride"
         options={{
           href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="support"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="vehicles"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="documents"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

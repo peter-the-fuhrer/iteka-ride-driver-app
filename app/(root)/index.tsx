@@ -1,20 +1,29 @@
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  Switch,
+  Dimensions,
+  Animated,
+  TouchableOpacity,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import { Power, MapPin, DollarSign, Star, Clock } from "lucide-react-native";
+import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
+import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { Power } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore, RideRequest } from "../../store/driverStore";
 import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import RideRequestCard from "../../components/home/RideRequestCard";
-import { useEffect } from "react";
+import GoButton from "../../components/common/GoButton";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+
+const { width, height } = Dimensions.get("window");
+
+// Constants for animations
+const PULSE_DURATION = 2000;
 
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -28,7 +37,50 @@ export default function Home() {
     setRideRequest,
     acceptRide,
     declineRide,
+    currentLocation,
+    setCurrentLocation,
   } = useDriverStore();
+
+  const bottomSheetRef = useRef<BottomSheet>(null);
+
+  // Snap points
+  const snapPoints = useMemo(() => {
+    return rideRequest ? ["50%"] : ["25%"];
+  }, [rideRequest]);
+
+  // Expand or collapse based on state
+  useEffect(() => {
+    if (rideRequest) {
+      bottomSheetRef.current?.expand();
+    } else {
+      bottomSheetRef.current?.snapToIndex(0);
+    }
+  }, [rideRequest]);
+
+  // Pulse animation for waiting state
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  // Setup Pulse Loop
+  useEffect(() => {
+    if (isOnline && !rideRequest) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: PULSE_DURATION,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    } else {
+      pulseAnim.setValue(0);
+    }
+  }, [isOnline, rideRequest]);
 
   // Simulate ride request for demo purposes
   useEffect(() => {
@@ -54,157 +106,203 @@ export default function Home() {
           requestTime: new Date().toISOString(),
         };
         setRideRequest(mockRequest);
-      }, 5000);
+      }, 5000); // 5 seconds delay
       return () => clearTimeout(timer);
     }
   }, [isOnline, rideRequest]);
+
+  // Set initial location for demo
+  useEffect(() => {
+    if (!currentLocation) {
+      setCurrentLocation({
+        latitude: -3.3822,
+        longitude: 29.3644,
+      });
+    }
+  }, []);
 
   const handleAccept = () => {
     acceptRide();
     router.push("/(root)/active-ride");
   };
 
-  const handleToggleOnline = () => {
-    if (isOnline) {
-      useAlertStore.getState().showAlert({
-        title: t("alert_go_offline_title"),
-        message: t("alert_go_offline_msg"),
-        type: "warning",
-        buttons: [
-          { text: t("no_stay_online"), style: "cancel" },
-          {
-            text: t("yes_go_offline"),
-            style: "destructive",
-            onPress: () => setOnlineStatus(false),
-          },
-        ],
-      });
-    } else {
-      useAlertStore.getState().showAlert({
-        title: t("alert_go_online_title"),
-        message: t("alert_go_online_msg"),
-        type: "info",
-        buttons: [
-          { text: t("no_stay_offline"), style: "cancel" },
-          {
-            text: t("yes_go_online"),
-            onPress: () => setOnlineStatus(true),
-          },
-        ],
-      });
-    }
+  const handleGoOnline = () => {
+    useAlertStore.getState().showAlert({
+      title: t("alert_go_online_title"),
+      message: t("alert_go_online_msg"),
+      type: "info",
+      buttons: [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("yes_go_online"),
+          onPress: () => setOnlineStatus(true),
+        },
+      ],
+    });
   };
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{t("welcome")}</Text>
-          <Text style={styles.driverName}>Captain</Text>
-        </View>
-        <TouchableOpacity
-          onPress={handleToggleOnline}
-          style={[
-            styles.statusButton,
-            isOnline ? styles.statusButtonOnline : styles.statusButtonOffline,
-          ]}
-        >
-          <Power size={18} color={isOnline ? "#22c55e" : "#6b7280"} />
-          <Text
-            style={[
-              styles.statusText,
-              isOnline ? styles.statusTextOnline : styles.statusTextOffline,
-            ]}
-          >
-            {isOnline ? t("online") : t("offline")}
-          </Text>
-        </TouchableOpacity>
-      </View>
+  const handleGoOffline = () => {
+    useAlertStore.getState().showAlert({
+      title: t("alert_go_offline_title"),
+      message: t("alert_go_offline_msg"),
+      type: "warning",
+      buttons: [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("yes_go_offline"),
+          style: "destructive",
+          onPress: () => setOnlineStatus(false),
+        },
+      ],
+    });
+  };
 
-      {/* Earnings Card */}
-      <View style={styles.earningsCard}>
-        <View style={styles.earningsHeader}>
-          <Text style={styles.earningsLabel}>{t("earnings_today")}</Text>
-          <DollarSign size={24} color={Colors.primary} />
-        </View>
-        <Text style={styles.earningsAmount}>
-          {stats.todayEarnings.toLocaleString()} FBU
-        </Text>
-        <View style={styles.earningsStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.todayRides}</Text>
-            <Text style={styles.statLabel}>{t("total_rides")}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {stats.hoursOnline.toFixed(1)}h
-            </Text>
-            <Text style={styles.statLabel}>{t("hours_online")}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.rating.toFixed(1)}</Text>
-            <Text style={styles.statLabel}>{t("rating")}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Status Message */}
-      <View style={styles.statusMessage}>
-        {isOnline ? (
-          <>
-            <View style={styles.pulsingDot} />
-            <Text style={styles.statusMessageText}>
-              {t("you_are_online")} - Waiting for ride requests...
-            </Text>
-          </>
-        ) : (
-          <>
-            <MapPin size={20} color="#9ca3af" />
-            <Text style={styles.statusMessageTextOffline}>
-              {t("you_are_offline")} - Go online to start earning
-            </Text>
-          </>
-        )}
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <Text style={styles.sectionTitle}>Quick Stats</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <View style={styles.statIconWrapper}>
-              <DollarSign size={20} color={Colors.primary} />
-            </View>
-            <Text style={styles.statCardValue}>
-              {stats.weeklyEarnings.toLocaleString()}
-            </Text>
-            <Text style={styles.statCardLabel}>{t("this_week")}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={styles.statIconWrapper}>
-              <DollarSign size={20} color={Colors.primary} />
-            </View>
-            <Text style={styles.statCardValue}>
-              {stats.monthlyEarnings.toLocaleString()}
-            </Text>
-            <Text style={styles.statCardLabel}>{t("this_month")}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Ride Request Card Overlay */}
-      {rideRequest && (
-        <View style={styles.requestOverlay}>
+  const renderBottomSheetContent = useCallback(() => {
+    if (rideRequest) {
+      return (
+        <BottomSheetView style={styles.sheetContentRequest}>
           <RideRequestCard
             request={rideRequest}
             onAccept={handleAccept}
             onDecline={declineRide}
           />
+        </BottomSheetView>
+      );
+    }
+
+    return (
+      <BottomSheetView style={styles.sheetContentRequest}>
+        <View style={styles.dashboardCard}>
+          <View style={styles.statsHeader}>
+            <Text style={styles.statsTitle}>{t("today_summary")}</Text>
+          </View>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.todayRides}</Text>
+              <Text style={styles.statLabel}>{t("rides")}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {stats.hoursOnline.toFixed(1)}h
+              </Text>
+              <Text style={styles.statLabel}>{t("online")}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.rating.toFixed(1)}</Text>
+              <Text style={styles.statLabel}>{t("rating")}</Text>
+            </View>
+          </View>
+        </View>
+      </BottomSheetView>
+    );
+  }, [rideRequest, stats, t]);
+
+  return (
+    <View style={styles.container}>
+      {/* Map View Background */}
+      <MapView
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        initialRegion={{
+          latitude: -3.3822,
+          longitude: 29.3644,
+          latitudeDelta: 0.0122,
+          longitudeDelta: 0.0069,
+        }}
+        showsUserLocation={true}
+        followsUserLocation={true}
+      />
+
+      {/* Online Status Overlay (Searching Pulse) */}
+      {isOnline && !rideRequest && (
+        <View style={styles.pulseContainer} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.pulseOrbit,
+              {
+                transform: [
+                  {
+                    scale: pulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.5, 2],
+                    }),
+                  },
+                ],
+                opacity: pulseAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.6, 0],
+                }),
+              },
+            ]}
+          />
+          <View style={styles.searchingPill}>
+            <View style={styles.pulsingDot} />
+            <Text style={styles.searchingText}>
+              {t("searching_for_rides")}...
+            </Text>
+          </View>
         </View>
       )}
+
+      {/* Top Header Area: Earnings */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+        <View style={styles.headerContent}>
+          {/* Offline Text (Only visible when offline) */}
+          {!isOnline ? (
+            <View style={styles.offlineTag}>
+              <Text style={styles.offlineTagText}>{t("you_are_offline")}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+
+          {/* Daily Earnings Pill */}
+          <View style={styles.earningsPill}>
+            <Text style={styles.earningsLabel}>{t("today")}</Text>
+            <Text style={styles.earningsValue}>
+              {stats.todayEarnings.toLocaleString()} FBU
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Offline GO Button */}
+      {!isOnline && (
+        <View style={styles.goButtonContainer}>
+          <GoButton onPress={handleGoOnline} />
+        </View>
+      )}
+
+      {/* Online Stop Button */}
+      {isOnline && !rideRequest && (
+        <TouchableOpacity
+          style={styles.stopButton}
+          onPress={handleGoOffline}
+          activeOpacity={0.8}
+        >
+          <Power size={24} color={Colors.white} />
+        </TouchableOpacity>
+      )}
+
+      {/* Bottom Sheet */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        snapPoints={snapPoints}
+        enablePanDownToClose={false}
+        handleIndicatorStyle={{
+          backgroundColor: Colors.gray[300],
+          opacity: 0, // Always hide handle for floating look
+        }}
+        backgroundStyle={{
+          backgroundColor: "transparent",
+          shadowColor: "transparent",
+          elevation: 0,
+        }}
+      >
+        {renderBottomSheetContent()}
+      </BottomSheet>
     </View>
   );
 }
@@ -212,175 +310,177 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: Colors.white,
   },
-  requestOverlay: {
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  headerContainer: {
     position: "absolute",
-    bottom: Platform.OS === "ios" ? 20 : 10,
+    top: 0,
     left: 0,
     right: 0,
-    zIndex: 1000,
+    zIndex: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  header: {
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    marginTop: 10,
   },
-  greeting: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
-    color: "#6b7280",
+  offlineTag: {
+    backgroundColor: Colors.black,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  driverName: {
-    fontSize: 24,
+  offlineTagText: {
+    color: Colors.white,
     fontFamily: "Poppins_600SemiBold",
-    color: "black",
+    fontSize: 12,
   },
-  statusButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  earningsPill: {
+    backgroundColor: Colors.white,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  statusButtonOnline: {
-    backgroundColor: "rgba(34, 197, 94, 0.1)",
-    borderColor: "#22c55e",
-  },
-  statusButtonOffline: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
-  },
-  statusText: {
-    fontSize: 14,
-    fontFamily: "Poppins_600SemiBold",
-  },
-  statusTextOnline: {
-    color: "#22c55e",
-  },
-  statusTextOffline: {
-    color: "#6b7280",
-  },
-  earningsCard: {
-    margin: 20,
-    padding: 20,
-    backgroundColor: "#f9fafb",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#f3f4f6",
-  },
-  earningsHeader: {
+    borderRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 8,
     alignItems: "center",
-    marginBottom: 8,
   },
   earningsLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    color: Colors.gray[500],
+  },
+  earningsValue: {
     fontSize: 14,
-    fontFamily: "Poppins_500Medium",
-    color: "#6b7280",
+    fontFamily: "Poppins_600SemiBold",
+    color: Colors.black,
   },
-  earningsAmount: {
-    fontSize: 36,
-    fontFamily: "Poppins_700Bold",
-    color: "black",
+  sheetContent: {
+    flex: 1,
+    padding: 20,
+  },
+  sheetContentRequest: {
+    flex: 1,
+    padding: 0,
+    backgroundColor: "transparent",
+  },
+  dashboardCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: 20,
+    marginHorizontal: 20,
+    marginBottom: 20, // Floating margin
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  statsHeader: {
     marginBottom: 16,
+    alignItems: "center",
   },
-  earningsStats: {
+  statsTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins_600SemiBold",
+    color: Colors.gray[800],
+  },
+  statsGrid: {
     flexDirection: "row",
     justifyContent: "space-around",
+    alignItems: "center",
+    paddingBottom: 20,
   },
   statItem: {
     alignItems: "center",
   },
   statValue: {
-    fontSize: 18,
-    fontFamily: "Poppins_600SemiBold",
-    color: "black",
+    fontSize: 24,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.black,
   },
   statLabel: {
-    fontSize: 11,
-    fontFamily: "Poppins_400Regular",
-    color: "#9ca3af",
-    marginTop: 4,
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    color: Colors.gray[400],
+    marginTop: 2,
   },
   statDivider: {
     width: 1,
-    backgroundColor: "#e5e7eb",
+    height: 40,
+    backgroundColor: Colors.gray[100],
   },
-  statusMessage: {
+  pulseContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
+  },
+  pulseOrbit: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(254, 202, 5, 0.3)", // Primary color with opacity
+    position: "absolute",
+  },
+  searchingPill: {
+    backgroundColor: Colors.black,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginHorizontal: 20,
-    padding: 16,
-    backgroundColor: "#f9fafb",
-    borderRadius: 12,
-    marginBottom: 24,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    marginTop: 250,
   },
   pulsingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#22c55e",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.primary,
   },
-  statusMessageText: {
-    flex: 1,
-    fontSize: 14,
+  searchingText: {
+    color: Colors.white,
     fontFamily: "Poppins_500Medium",
-    color: "#22c55e",
-  },
-  statusMessageTextOffline: {
-    flex: 1,
     fontSize: 14,
-    fontFamily: "Poppins_500Medium",
-    color: "#6b7280",
   },
-  quickActions: {
-    paddingHorizontal: 20,
+  goButtonContainer: {
+    position: "absolute",
+    bottom: 120, // Sit above the bottom sheet
+    alignSelf: "center",
+    zIndex: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: "Poppins_600SemiBold",
-    color: "black",
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "white",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#f3f4f6",
-    alignItems: "center",
-  },
-  statIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(254, 202, 5, 0.1)",
-    alignItems: "center",
+  stopButton: {
+    position: "absolute",
+    bottom: 120, // Sit above the bottom sheet
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.error,
     justifyContent: "center",
-    marginBottom: 12,
-  },
-  statCardValue: {
-    fontSize: 20,
-    fontFamily: "Poppins_600SemiBold",
-    color: "black",
-    marginBottom: 4,
-  },
-  statCardLabel: {
-    fontSize: 12,
-    fontFamily: "Poppins_400Regular",
-    color: "#6b7280",
-    textAlign: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 20,
   },
 });

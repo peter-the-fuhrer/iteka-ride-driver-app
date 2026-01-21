@@ -20,14 +20,18 @@ import {
   Bell,
   Languages,
   Moon,
+  Wallet,
+  HelpCircle,
 } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useRouter } from "expo-router";
+import { useDriverStore } from "../../store/driverStore";
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  const { stats } = useDriverStore();
 
   const ProfileItem = ({
     icon: Icon,
@@ -75,6 +79,9 @@ export default function Profile() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("profile")}</Text>
+        <TouchableOpacity onPress={() => router.push("/notifications")}>
+          <Bell size={24} color={Colors.black} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -85,56 +92,57 @@ export default function Profile() {
               <User size={40} color={Colors.gray[400]} />
             </View>
             <TouchableOpacity style={styles.editAvatar}>
-              <Text style={styles.editAvatarText}>Edit</Text>
+              <Text style={styles.editAvatarText}>{t("edit")}</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.driverName}>Captain John Doe</Text>
+          <Text style={styles.driverName}>{t("driver_name_default")}</Text>
           <Text style={styles.driverRating}>⭐ 4.9 • {t("verified")}</Text>
         </View>
 
         {/* Info Sections */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("personal_info")}</Text>
-          <ProfileItem icon={User} label={t("full_name")} value="John Doe" />
+          <Text style={styles.sectionTitle}>{t("account")}</Text>
           <ProfileItem
-            icon={Shield}
-            label={t("phone")}
-            value="+257 123 456 78"
+            icon={User}
+            label={t("personal_info")}
+            value="John Doe"
+          />
+          <ProfileItem
+            icon={Wallet}
+            label={t("wallet")}
+            value={`${stats.netBalance.toLocaleString()} FBU`}
+            onPress={() => router.push("/wallet")}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("vehicle_details")}</Text>
+          <Text style={styles.sectionTitle}>{t("vehicle_and_docs")}</Text>
           <ProfileItem
             icon={Car}
-            label={t("vehicle_model")}
+            label={t("my_vehicles")}
             value="Toyota Corolla"
-          />
-          <ProfileItem
-            icon={Shield}
-            label={t("license_plate")}
-            value="B 1234 A"
+            onPress={() => router.push("/vehicles")}
           />
           <ProfileItem
             icon={FileText}
             label={t("documents")}
-            value={t("verified")}
+            value={t("action_required")}
+            onPress={() => router.push("/documents")}
           />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("settings")}</Text>
           <ProfileItem
+            icon={HelpCircle}
+            label={t("support")}
+            onPress={() => router.push("/support")}
+          />
+          <ProfileItem
             icon={Languages}
             label={t("language")}
             value={i18n.language.toUpperCase()}
             onPress={toggleLanguage}
-          />
-          <ProfileItem
-            icon={Bell}
-            label={t("notifications")}
-            isSwitch
-            switchValue={true}
           />
           <ProfileItem
             icon={Moon}
@@ -152,7 +160,7 @@ export default function Profile() {
           <Text style={styles.logoutText}>{t("logout")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versionText}>Version 1.0.0</Text>
+        <Text style={styles.versionText}>{t("version")} 1.0.0</Text>
       </ScrollView>
     </View>
   );
