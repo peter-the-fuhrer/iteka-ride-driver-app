@@ -11,8 +11,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_URL_LOCAL = "http://localhost:5000/api";
 // const API_URL_LOCAL = "http://192.168.1.100:5000/api"; // Example: Replace with your actual IP
 
-// PRODUCTION API - Your deployed backend URL
-const API_URL_PROD = "https://api.itekaride.bi/api"; // Replace with your actual production URL
+// PRODUCTION API - Render deployed backend
+const API_URL_PROD = "https://iteka-ride-backend.onrender.com/api";
 
 // ============================================
 // ACTIVE API URL - Change this to switch environments
@@ -23,7 +23,7 @@ export const API_BASE_URL = IS_PRODUCTION ? API_URL_PROD : API_URL_LOCAL;
 
 // Socket URL (same host, no /api path)
 export const SOCKET_URL = IS_PRODUCTION
-  ? "https://api.itekaride.bi"
+  ? "https://iteka-ride-backend.onrender.com"
   : "http://localhost:5000";
 
 // Create axios instance
