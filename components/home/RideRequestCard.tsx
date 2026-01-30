@@ -29,15 +29,14 @@ export default function RideRequestCard({
   const [timeLeft, setTimeLeft] = useState(30);
 
   useEffect(() => {
+    if (timeLeft === 0) {
+      onDecline();
+    }
+  }, [timeLeft, onDecline]);
+
+  useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onDecline();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => clearInterval(timer);

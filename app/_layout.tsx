@@ -12,6 +12,7 @@ import { useColorScheme } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
   useFonts,
   Poppins_400Regular,
@@ -42,9 +43,8 @@ export default function RootLayout() {
         // Clear for development - remove in production
         // await AsyncStorage.clear();
 
-        const hasSeenOnboarding = await AsyncStorage.getItem(
-          "hasSeenOnboarding"
-        );
+        const hasSeenOnboarding =
+          await AsyncStorage.getItem("hasSeenOnboarding");
         if (hasSeenOnboarding === "true") {
           router.replace("/auth/login");
         }
@@ -67,24 +67,27 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack
-          screenOptions={{
-            headerStyle: {
-              backgroundColor:
-                colorScheme === "dark" ? Colors.black : Colors.primary,
-            },
-            headerTintColor: colorScheme === "dark" ? "#fff" : "#000",
-            headerTitleStyle: {
-              fontFamily: "Poppins_700Bold",
-            },
-          }}
-        >
-          <Stack.Screen name="auth" options={{ headerShown: false }} />
-          <Stack.Screen name="(root)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-        <CustomAlert />
+        <BottomSheetModalProvider>
+          <Stack
+            screenOptions={{
+              headerStyle: {
+                backgroundColor:
+                  colorScheme === "dark" ? Colors.black : Colors.primary,
+              },
+              headerTintColor: colorScheme === "dark" ? "#fff" : "#000",
+              headerTitleStyle: {
+                fontFamily: "Poppins_700Bold",
+              },
+            }}
+          >
+            <Stack.Screen name="auth" options={{ headerShown: false }} />
+            <Stack.Screen name="(root)" options={{ headerShown: false }} />
+            <Stack.Screen name="chat/index" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+          <CustomAlert />
+        </BottomSheetModalProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

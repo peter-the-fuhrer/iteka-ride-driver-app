@@ -25,6 +25,8 @@ import { useDriverStore } from "../../store/driverStore";
 import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState, useEffect } from "react";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { ChatBottomSheet } from "../../components/home/ChatBottomSheet";
 
 const { width, height } = Dimensions.get("window");
 
@@ -57,8 +59,13 @@ export default function ActiveRide() {
   const [carHeading, setCarHeading] = useState(0); // Car rotation angle
 
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const chatBottomSheetRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ["45%", "80%"], []);
   const mapRef = useRef<MapView>(null);
+
+  const handleOpenChat = () => {
+    chatBottomSheetRef.current?.present();
+  };
 
   // Fetch route from OpenRouteService
   useEffect(() => {
@@ -151,28 +158,30 @@ export default function ActiveRide() {
         if (prevIndex >= routeCoordinates.length - 1) {
           return prevIndex;
         }
-
-        // Move to next coordinate in the route
-        const nextIndex = prevIndex + 1;
-        const currentCoord = routeCoordinates[prevIndex];
-        const nextCoord = routeCoordinates[nextIndex];
-
-        if (nextCoord && currentCoord) {
-          // Calculate heading (bearing) from current to next point
-          const deltaLng = nextCoord.longitude - currentCoord.longitude;
-          const deltaLat = nextCoord.latitude - currentCoord.latitude;
-          const heading = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
-
-          setCarHeading(heading);
-          setDriverLocation(nextCoord);
-        }
-
-        return nextIndex;
+        return prevIndex + 1;
       });
     }, 1000); // Move to next point every second
 
     return () => clearInterval(interval);
   }, [activeRide?.status, routeCoordinates]);
+
+  // Update position and heading when index changes
+  useEffect(() => {
+    if (currentRouteIndex > 0 && routeCoordinates[currentRouteIndex]) {
+      const currentCoord = routeCoordinates[currentRouteIndex - 1];
+      const nextCoord = routeCoordinates[currentRouteIndex];
+
+      if (nextCoord && currentCoord) {
+        // Calculate heading (bearing) from current to next point
+        const deltaLng = nextCoord.longitude - currentCoord.longitude;
+        const deltaLat = nextCoord.latitude - currentCoord.latitude;
+        const heading = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
+
+        setCarHeading(heading);
+        setDriverLocation(nextCoord);
+      }
+    }
+  }, [currentRouteIndex, routeCoordinates]);
 
   // Reset route index when route changes
   useEffect(() => {
@@ -397,11 +406,23 @@ export default function ActiveRide() {
               <View style={styles.communicationButtons}>
                 <TouchableOpacity
                   style={[styles.circleButton, { backgroundColor: "#f0fdf4" }]}
+                  onPress={handleOpenChat}
                 >
                   <MessageSquare size={20} color={Colors.success} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.circleButton, { backgroundColor: "#eff6ff" }]}
+                  onPress={() => {
+                    if (activeRide?.customerPhone) {
+                      const phoneNumber = activeRide.customerPhone.replace(
+                        /\s+/g,
+                        "",
+                      );
+                      import("react-native").then(({ Linking }) => {
+                        Linking.openURL(`tel:${phoneNumber}`);
+                      });
+                    }
+                  }}
                 >
                   <Phone size={20} color={Colors.info} />
                 </TouchableOpacity>
@@ -480,6 +501,9 @@ export default function ActiveRide() {
           <View style={{ height: 40 }} />
         </BottomSheetScrollView>
       </BottomSheet>
+
+      {/* Chat Bottom Sheet Modal */}
+      <ChatBottomSheet ref={chatBottomSheetRef} />
     </View>
   );
 }

@@ -12,7 +12,11 @@ import { useTranslation } from "react-i18next";
 import { DollarSign, TrendingUp, Clock, Calendar } from "lucide-react-native";
 import { Svg, Rect, Text as SvgText, G } from "react-native-svg";
 import { Colors } from "../../constants/Colors";
-import { useDriverStore } from "../../store/driverStore";
+import { useDriverStore, RideHistory } from "../../store/driverStore";
+import { useRouter } from "expo-router";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import { RideDetailsModal } from "../../components/home/RideDetailsModal";
+import { useRef, useState } from "react";
 
 const { width } = Dimensions.get("window");
 
@@ -22,7 +26,16 @@ const CHART_WIDTH = width - 40;
 export default function Earnings() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const router = useRouter();
   const { stats, rideHistory } = useDriverStore();
+
+  const detailsModalRef = useRef<BottomSheetModal>(null);
+  const [selectedRide, setSelectedRide] = useState<RideHistory | null>(null);
+
+  const handleRidePress = (ride: RideHistory) => {
+    setSelectedRide(ride);
+    detailsModalRef.current?.present();
+  };
 
   // Mock Weekly Data
   const weeklyData = [
@@ -135,7 +148,7 @@ export default function Earnings() {
         {/* Recent Activity */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t("recent_trips")}</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/(root)/history")}>
             <Text style={styles.seeAllText}>{t("see_all")}</Text>
           </TouchableOpacity>
         </View>
@@ -143,7 +156,11 @@ export default function Earnings() {
         <View style={styles.historyList}>
           {rideHistory.length > 0 ? (
             rideHistory.slice(0, 5).map((ride) => (
-              <View key={ride.id} style={styles.historyItem}>
+              <TouchableOpacity
+                key={ride.id}
+                style={styles.historyItem}
+                onPress={() => handleRidePress(ride)}
+              >
                 <View style={styles.historyLeft}>
                   <Text style={styles.historyDate}>
                     {new Date(ride.date).toLocaleTimeString([], {
@@ -173,7 +190,7 @@ export default function Earnings() {
                     {ride.status}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           ) : (
             <View style={styles.emptyState}>
@@ -182,6 +199,12 @@ export default function Earnings() {
           )}
         </View>
       </ScrollView>
+
+      <RideDetailsModal
+        ref={detailsModalRef}
+        ride={selectedRide}
+        onClose={() => detailsModalRef.current?.dismiss()}
+      />
     </View>
   );
 }

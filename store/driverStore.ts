@@ -38,6 +38,7 @@ export interface RideHistory {
   distance: number;
   duration: number;
   rating?: number;
+  customerPhone?: string;
   status: "completed" | "cancelled";
 }
 
@@ -103,6 +104,7 @@ const mockRideHistory: RideHistory[] = [
     distance: 4.2,
     duration: 15,
     rating: 5,
+    customerPhone: "+257 79 123 456",
     status: "completed",
   },
   {
@@ -116,6 +118,7 @@ const mockRideHistory: RideHistory[] = [
     distance: 12.5,
     duration: 30,
     rating: 5,
+    customerPhone: "+257 71 888 999",
     status: "completed",
   },
   {
@@ -263,6 +266,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
         distance: activeRide.distance,
         duration: activeRide.duration,
         rating,
+        customerPhone: activeRide.customerPhone,
         status: "completed",
       };
 
@@ -300,6 +304,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
         commission: 0,
         distance: activeRide.distance,
         duration: activeRide.duration,
+        customerPhone: activeRide.customerPhone,
         status: "cancelled",
       };
 
