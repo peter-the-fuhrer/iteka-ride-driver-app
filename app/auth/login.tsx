@@ -8,30 +8,51 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, Phone, Lock } from "lucide-react-native";
+import { ArrowLeft, Mail, Lock } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useAlertStore } from "../../store/alertStore";
+import { useAuthStore } from "../../store/authStore";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
 export default function Login() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const [phone, setPhone] = useState("");
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (phone && pin.length === 4) {
+  const { login, error, clearError } = useAuthStore();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      useAlertStore.getState().showAlert({
+        title: t("alert_login_failed_title") || "Login Failed",
+        message: t("fill_all_fields") || "Please fill all fields",
+        type: "error",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    clearError();
+
+    const success = await login({ email, password });
+
+    setIsLoading(false);
+
+    if (success) {
       router.replace("/(root)");
     } else {
       useAlertStore.getState().showAlert({
-        title: t("alert_login_failed_title"),
-        message: t("alert_login_failed_msg"),
+        title: t("alert_login_failed_title") || "Login Failed",
+        message: error || t("invalid_credentials") || "Invalid email or password",
         type: "error",
       });
     }
@@ -76,46 +97,53 @@ export default function Login() {
           </View>
 
           <View style={styles.form}>
-            <View style={getInputStyle("phone")}>
-              <Phone size={20} color="#9ca3af" />
+            <View style={getInputStyle("email")}>
+              <Mail size={20} color="#9ca3af" />
               <TextInput
                 style={styles.input}
-                placeholder={t("enter_phone")}
+                placeholder={t("enter_email") || "Email address"}
                 placeholderTextColor="#9ca3af"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                onFocus={() => setFocusedField("phone")}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setFocusedField("email")}
                 onBlur={() => setFocusedField(null)}
+                editable={!isLoading}
               />
             </View>
 
-            <View style={getInputStyle("pin")}>
+            <View style={getInputStyle("password")}>
               <Lock size={20} color="#9ca3af" />
               <TextInput
                 style={styles.input}
-                placeholder={t("enter_pin")}
+                placeholder={t("enter_password") || "Password"}
                 placeholderTextColor="#9ca3af"
-                value={pin}
-                onChangeText={setPin}
-                keyboardType="number-pad"
-                maxLength={4}
+                value={password}
+                onChangeText={setPassword}
                 secureTextEntry
-                onFocus={() => setFocusedField("pin")}
+                onFocus={() => setFocusedField("password")}
                 onBlur={() => setFocusedField(null)}
+                editable={!isLoading}
               />
             </View>
 
             <TouchableOpacity style={styles.forgotPin}>
-              <Text style={styles.forgotPinText}>{t("forgot_pin")}</Text>
+              <Text style={styles.forgotPinText}>{t("forgot_password") || "Forgot password?"}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleLogin}
-              style={styles.loginButton}
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
               activeOpacity={0.8}
+              disabled={isLoading}
             >
-              <Text style={styles.loginButtonText}>{t("login")}</Text>
+              {isLoading ? (
+                <ActivityIndicator color="black" />
+              ) : (
+                <Text style={styles.loginButtonText}>{t("login")}</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -231,6 +259,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginButtonText: {
     color: "black",

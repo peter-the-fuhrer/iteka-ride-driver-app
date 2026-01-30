@@ -209,7 +209,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
   isOnline: false,
   currentLocation: null,
   rideRequest: null,
-  activeRide: mockActiveRide, // Set active ride for testing
+  activeRide: null, // No active ride by default
   rideHistory: mockRideHistory,
   stats: initialStats,
 

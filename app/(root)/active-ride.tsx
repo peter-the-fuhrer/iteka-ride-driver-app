@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -25,6 +26,7 @@ import { useDriverStore } from "../../store/driverStore";
 import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState, useEffect } from "react";
+import { updateRideState } from "../../services/driver";
 
 const { width, height } = Dimensions.get("window");
 
@@ -216,27 +218,64 @@ export default function ActiveRide() {
     );
   }
 
-  const handleAction = () => {
-    if (activeRide.status === "accepted") {
-      updateRideStatus("arrived");
-    } else if (activeRide.status === "arrived") {
-      updateRideStatus("started");
-    } else if (activeRide.status === "started") {
-      useAlertStore.getState().showAlert({
-        title: t("alert_complete_trip_title"),
-        message: t("alert_complete_trip_msg"),
-        type: "success",
-        buttons: [
-          { text: t("cancel"), style: "cancel" },
-          {
-            text: t("yes_complete"),
-            onPress: () => {
-              completeRide(activeRide.estimatedFare);
-              router.replace("/(root)");
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  const handleAction = async () => {
+    const tripId = activeRide.id;
+    setIsActionLoading(true);
+
+    try {
+      if (activeRide.status === "accepted") {
+        // Call API to update status to driver_arrived
+        if (!tripId.startsWith("demo-")) {
+          await updateRideState(tripId, "driver_arrived");
+        }
+        updateRideStatus("arrived");
+      } else if (activeRide.status === "arrived") {
+        // Call API to update status to ongoing
+        if (!tripId.startsWith("demo-")) {
+          await updateRideState(tripId, "ongoing");
+        }
+        updateRideStatus("started");
+      } else if (activeRide.status === "started") {
+        setIsActionLoading(false);
+        useAlertStore.getState().showAlert({
+          title: t("alert_complete_trip_title"),
+          message: t("alert_complete_trip_msg"),
+          type: "success",
+          buttons: [
+            { text: t("cancel"), style: "cancel" },
+            {
+              text: t("yes_complete"),
+              onPress: async () => {
+                try {
+                  // Call API to update status to completed
+                  if (!tripId.startsWith("demo-")) {
+                    await updateRideState(tripId, "completed");
+                  }
+                  completeRide(activeRide.estimatedFare);
+                  router.replace("/(root)");
+                } catch (error: any) {
+                  useAlertStore.getState().showAlert({
+                    title: t("error") || "Error",
+                    message: error.message || "Could not complete trip",
+                    type: "error",
+                  });
+                }
+              },
             },
-          },
-        ],
+          ],
+        });
+        return;
+      }
+    } catch (error: any) {
+      useAlertStore.getState().showAlert({
+        title: t("error") || "Error",
+        message: error.message || "Could not update ride status",
+        type: "error",
       });
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -250,9 +289,22 @@ export default function ActiveRide() {
         {
           text: t("yes_cancel"),
           style: "destructive",
-          onPress: () => {
-            cancelRide();
-            router.replace("/(root)");
+          onPress: async () => {
+            try {
+              const tripId = activeRide.id;
+              // Call API to cancel (could use updateRideState with cancelled status)
+              if (!tripId.startsWith("demo-")) {
+                await updateRideState(tripId, "cancelled");
+              }
+              cancelRide();
+              router.replace("/(root)");
+            } catch (error: any) {
+              useAlertStore.getState().showAlert({
+                title: t("error") || "Error",
+                message: error.message || "Could not cancel trip",
+                type: "error",
+              });
+            }
           },
         },
       ],
@@ -420,13 +472,20 @@ export default function ActiveRide() {
               <XCircle size={24} color={Colors.error} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.mainActionButton}
+              style={[styles.mainActionButton, isActionLoading && styles.mainActionButtonDisabled]}
               onPress={handleAction}
+              disabled={isActionLoading}
             >
-              <Text style={styles.mainActionButtonText}>
-                {getActionButtonText()}
-              </Text>
-              <CheckCircle2 size={24} color={Colors.black} />
+              {isActionLoading ? (
+                <ActivityIndicator color={Colors.black} />
+              ) : (
+                <>
+                  <Text style={styles.mainActionButtonText}>
+                    {getActionButtonText()}
+                  </Text>
+                  <CheckCircle2 size={24} color={Colors.black} />
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -642,6 +701,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+  },
+  mainActionButtonDisabled: {
+    opacity: 0.7,
   },
   mainActionButtonText: {
     fontSize: 18,

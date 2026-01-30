@@ -23,12 +23,16 @@ import {
 import "../i18n";
 import { Colors } from "../constants/Colors";
 import CustomAlert from "../components/common/CustomAlert";
+import { useAuthStore } from "../store/authStore";
+import { initSocket, disconnectSocket } from "../services/socket";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { checkAuth, isAuthenticated } = useAuthStore();
+
   const [loaded, error] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -36,29 +40,45 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
+  // Check auth status and onboarding on app start
   useEffect(() => {
-    const checkOnboarding = async () => {
+    const initializeApp = async () => {
       try {
-        // Clear for development - remove in production
-        // await AsyncStorage.clear();
+        // Check if driver has seen onboarding
+        const hasSeenOnboarding = await AsyncStorage.getItem("hasSeenOnboarding");
 
-        const hasSeenOnboarding = await AsyncStorage.getItem(
-          "hasSeenOnboarding"
-        );
-        if (hasSeenOnboarding === "true") {
+        // Check if driver is authenticated
+        const isLoggedIn = await checkAuth();
+
+        if (isLoggedIn) {
+          // Driver is logged in, initialize socket and go to main app
+          await initSocket();
+          router.replace("/(root)");
+        } else if (hasSeenOnboarding === "true") {
+          // Driver has seen onboarding but not logged in, go to login
           router.replace("/auth/login");
         }
+        // else: Driver hasn't seen onboarding, stay on welcome screen
       } catch (e) {
-        console.error("Failed to check onboarding", e);
+        console.error("Failed to initialize app", e);
       }
     };
 
     if (loaded || error) {
-      checkOnboarding().finally(() => {
+      initializeApp().finally(() => {
         SplashScreen.hideAsync();
       });
     }
   }, [loaded, error]);
+
+  // Initialize/disconnect socket based on auth status
+  useEffect(() => {
+    if (isAuthenticated) {
+      initSocket();
+    } else {
+      disconnectSocket();
+    }
+  }, [isAuthenticated]);
 
   if (!loaded && !error) {
     return null;

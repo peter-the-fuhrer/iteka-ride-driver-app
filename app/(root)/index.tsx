@@ -14,11 +14,19 @@ import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Power } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore, RideRequest } from "../../store/driverStore";
+import { useAuthStore } from "../../store/authStore";
 import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import RideRequestCard from "../../components/home/RideRequestCard";
 import GoButton from "../../components/common/GoButton";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import {
+  subscribeToEvent,
+  unsubscribeFromEvent,
+  joinDriverRoom,
+  updateLocation as socketUpdateLocation,
+} from "../../services/socket";
+import { updateStatus, acceptRide as apiAcceptRide, Trip } from "../../services/driver";
 
 const { width, height } = Dimensions.get("window");
 
@@ -40,6 +48,9 @@ export default function Home() {
     currentLocation,
     setCurrentLocation,
   } = useDriverStore();
+
+  const { driver } = useAuthStore();
+  const [currentTripId, setCurrentTripId] = useState<string | null>(null);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -82,31 +93,81 @@ export default function Home() {
     }
   }, [isOnline, rideRequest]);
 
-  // Simulate ride request for demo purposes
+  // Listen for ride requests via Socket.IO
+  useEffect(() => {
+    const handleNewRideRequest = (trip: Trip) => {
+      console.log("New ride request received:", trip);
+
+      // Convert backend Trip to RideRequest format
+      const clientData = typeof trip.client_id === 'object' ? trip.client_id : null;
+
+      const request: RideRequest = {
+        id: trip._id,
+        customerId: clientData?._id || (typeof trip.client_id === 'string' ? trip.client_id : ''),
+        customerName: clientData?.name || "Customer",
+        customerRating: clientData?.rating || 4.5,
+        customerPhone: clientData?.phone || "",
+        pickupLocation: {
+          address: trip.pickup.address,
+          coordinates: { latitude: trip.pickup.lat, longitude: trip.pickup.lng },
+        },
+        dropoffLocation: {
+          address: trip.destination.address,
+          coordinates: { latitude: trip.destination.lat, longitude: trip.destination.lng },
+        },
+        estimatedFare: trip.price,
+        distance: trip.distance / 1000, // Convert to km
+        duration: Math.round(trip.distance / 500), // Estimate duration
+        requestTime: trip.createdAt,
+      };
+
+      setCurrentTripId(trip._id);
+      setRideRequest(request);
+    };
+
+    if (isOnline) {
+      // Join driver room to receive ride requests
+      if (driver?._id) {
+        joinDriverRoom(driver._id);
+      }
+      subscribeToEvent("new_ride_request", handleNewRideRequest);
+    }
+
+    return () => {
+      unsubscribeFromEvent("new_ride_request", handleNewRideRequest);
+    };
+  }, [isOnline, driver?._id]);
+
+  // Fallback simulation for demo when no backend connection
   useEffect(() => {
     if (isOnline && !rideRequest) {
       const timer = setTimeout(() => {
-        const mockRequest: RideRequest = {
-          id: "123",
-          customerId: "c1",
-          customerName: "Alice Walker",
-          customerRating: 4.8,
-          customerPhone: "+257 71 234 567",
-          pickupLocation: {
-            address: "Boulevard de l'Uprona, Bujumbura",
-            coordinates: { latitude: -3.38, longitude: 29.36 },
-          },
-          dropoffLocation: {
-            address: "Avenue du Large, Bujumbura",
-            coordinates: { latitude: -3.4, longitude: 29.35 },
-          },
-          estimatedFare: 12500,
-          distance: 4.2,
-          duration: 12,
-          requestTime: new Date().toISOString(),
-        };
-        setRideRequest(mockRequest);
-      }, 5000); // 5 seconds delay
+        // Only simulate if no real request came in after 10 seconds
+        if (!useDriverStore.getState().rideRequest) {
+          console.log("No socket request, running demo simulation...");
+          const mockRequest: RideRequest = {
+            id: "demo-123",
+            customerId: "c1",
+            customerName: "Alice Walker",
+            customerRating: 4.8,
+            customerPhone: "+257 71 234 567",
+            pickupLocation: {
+              address: "Boulevard de l'Uprona, Bujumbura",
+              coordinates: { latitude: -3.38, longitude: 29.36 },
+            },
+            dropoffLocation: {
+              address: "Avenue du Large, Bujumbura",
+              coordinates: { latitude: -3.4, longitude: 29.35 },
+            },
+            estimatedFare: 12500,
+            distance: 4.2,
+            duration: 12,
+            requestTime: new Date().toISOString(),
+          };
+          setCurrentTripId("demo-123");
+          setRideRequest(mockRequest);
+        }
+      }, 10000); // 10 seconds delay for fallback
       return () => clearTimeout(timer);
     }
   }, [isOnline, rideRequest]);
@@ -121,9 +182,26 @@ export default function Home() {
     }
   }, []);
 
-  const handleAccept = () => {
-    acceptRide();
-    router.push("/(root)/active-ride");
+  const handleAccept = async () => {
+    if (!currentTripId) {
+      // Fallback for demo mode
+      acceptRide();
+      router.push("/(root)/active-ride");
+      return;
+    }
+
+    try {
+      // Call API to accept the ride
+      await apiAcceptRide(currentTripId);
+      acceptRide();
+      router.push("/(root)/active-ride");
+    } catch (error: any) {
+      useAlertStore.getState().showAlert({
+        title: t("error") || "Error",
+        message: error.message || "Could not accept ride",
+        type: "error",
+      });
+    }
   };
 
   const handleGoOnline = () => {
@@ -135,7 +213,26 @@ export default function Home() {
         { text: t("cancel"), style: "cancel" },
         {
           text: t("yes_go_online"),
-          onPress: () => setOnlineStatus(true),
+          onPress: async () => {
+            try {
+              // Call API to update status
+              await updateStatus({
+                is_online: true,
+                lat: currentLocation?.latitude,
+                lng: currentLocation?.longitude,
+              });
+              setOnlineStatus(true);
+
+              // Join driver room for ride requests
+              if (driver?._id) {
+                joinDriverRoom(driver._id);
+              }
+            } catch (error: any) {
+              console.error("Failed to go online:", error);
+              // Still set online locally for demo
+              setOnlineStatus(true);
+            }
+          },
         },
       ],
     });
@@ -151,7 +248,17 @@ export default function Home() {
         {
           text: t("yes_go_offline"),
           style: "destructive",
-          onPress: () => setOnlineStatus(false),
+          onPress: async () => {
+            try {
+              // Call API to update status
+              await updateStatus({ is_online: false });
+              setOnlineStatus(false);
+            } catch (error: any) {
+              console.error("Failed to go offline:", error);
+              // Still set offline locally
+              setOnlineStatus(false);
+            }
+          },
         },
       ],
     });
