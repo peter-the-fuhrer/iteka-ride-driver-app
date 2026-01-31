@@ -17,7 +17,7 @@ const API_URL_PROD = "https://iteka-ride-backend.onrender.com/api";
 // ============================================
 // ACTIVE API URL - Change this to switch environments
 // ============================================
-const IS_PRODUCTION = false; // Set to true for production
+const IS_PRODUCTION = true; // Set to true for production
 
 export const API_BASE_URL = IS_PRODUCTION ? API_URL_PROD : API_URL_LOCAL;
 
