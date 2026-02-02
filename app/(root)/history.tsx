@@ -4,17 +4,35 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { Clock, MapPin, Calendar, ChevronRight } from "lucide-react-native";
 import { useDriverStore, RideHistory } from "../../store/driverStore";
 import { Colors } from "../../constants/Colors";
+import { getRideHistory, mapTripToRideHistory } from "../../services/driver";
 
 export default function History() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { rideHistory } = useDriverStore();
+  const { rideHistory, setRideHistory } = useDriverStore();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getRideHistory({ limit: 50 });
+        if (!cancelled && res?.rides?.length) {
+          setRideHistory(res.rides.map(mapTripToRideHistory));
+        }
+      } catch (_) {}
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const renderItem = ({ item }: { item: RideHistory }) => (
     <TouchableOpacity style={styles.rideItem} activeOpacity={0.7}>
@@ -65,6 +83,14 @@ export default function History() {
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

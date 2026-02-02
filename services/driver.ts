@@ -1,4 +1,5 @@
 import api, { getApiErrorMessage } from "./api";
+import type { RideRequest, ActiveRide, RideHistory } from "../store/driverStore";
 
 export interface StatusUpdateData {
   is_online: boolean;
@@ -80,9 +81,9 @@ export const getActiveRide = async (): Promise<Trip | null> => {
 };
 
 // Get driver's ride history
-export const getRideHistory = async (): Promise<Trip[]> => {
+export const getRideHistory = async (params?: { page?: number; limit?: number }): Promise<{ rides: Trip[]; total: number; page: number; limit: number }> => {
   try {
-    const response = await api.get<Trip[]>("/driver-app/rides");
+    const response = await api.get<{ rides: Trip[]; total: number; page: number; limit: number }>("/driver-app/rides", { params });
     return response.data;
   } catch (error: any) {
     throw new Error(getApiErrorMessage(error));
@@ -90,7 +91,15 @@ export const getRideHistory = async (): Promise<Trip[]> => {
 };
 
 // Get driver earnings
-export const getEarnings = async (): Promise<any> => {
+export const getEarnings = async (): Promise<{
+  todayEarnings: number;
+  todayRides: number;
+  weeklyEarnings: number;
+  monthlyEarnings: number;
+  totalEarnings: number;
+  totalDebt: number;
+  netBalance: number;
+}> => {
   try {
     const response = await api.get("/driver-app/earnings");
     return response.data;
@@ -98,3 +107,56 @@ export const getEarnings = async (): Promise<any> => {
     throw new Error(getApiErrorMessage(error));
   }
 };
+
+// Map API Trip to store RideRequest/ActiveRide format
+export function mapTripToRideRequest(trip: Trip): RideRequest {
+  const clientData = typeof trip.client_id === "object" ? trip.client_id : null;
+  return {
+    id: trip._id,
+    customerId: clientData?._id ?? (typeof trip.client_id === "string" ? trip.client_id : ""),
+    customerName: clientData?.name ?? "Customer",
+    customerRating: clientData?.rating ?? 4.5,
+    customerPhone: clientData?.phone ?? "",
+    pickupLocation: {
+      address: trip.pickup.address,
+      coordinates: { latitude: trip.pickup.lat, longitude: trip.pickup.lng },
+    },
+    dropoffLocation: {
+      address: trip.destination.address,
+      coordinates: { latitude: trip.destination.lat, longitude: trip.destination.lng },
+    },
+    estimatedFare: trip.price,
+    distance: (trip.distance || 0) / 1000,
+    duration: Math.round((trip.distance || 0) / 500),
+    requestTime: trip.createdAt ?? trip.date_time,
+  };
+}
+
+const statusMap = {
+  driver_assigned: "accepted" as const,
+  driver_arrived: "arrived" as const,
+  ongoing: "started" as const,
+  completed: "completed" as const,
+};
+
+export function mapTripToActiveRide(trip: Trip): ActiveRide {
+  const base = mapTripToRideRequest(trip);
+  const status = statusMap[trip.status as keyof typeof statusMap] ?? "accepted";
+  return { ...base, status };
+}
+
+export function mapTripToRideHistory(trip: Trip): RideHistory {
+  const clientData = typeof trip.client_id === "object" ? trip.client_id : null;
+  return {
+    id: trip._id,
+    date: trip.createdAt ?? trip.date_time,
+    customerName: clientData?.name ?? "Customer",
+    pickup: trip.pickup?.address ?? "",
+    dropoff: trip.destination?.address ?? "",
+    fare: trip.price ?? 0,
+    commission: 0,
+    distance: (trip.distance ?? 0) / 1000,
+    duration: Math.round((trip.distance ?? 0) / 500),
+    status: trip.status === "cancelled" ? "cancelled" : "completed",
+  };
+}

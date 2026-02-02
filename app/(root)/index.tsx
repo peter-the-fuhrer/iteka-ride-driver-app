@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
+import MapboxMap from "../../components/Map/MapboxMap";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Power } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
@@ -26,7 +26,16 @@ import {
   joinDriverRoom,
   updateLocation as socketUpdateLocation,
 } from "../../services/socket";
-import { updateStatus, acceptRide as apiAcceptRide, Trip } from "../../services/driver";
+import {
+  updateStatus,
+  acceptRide as apiAcceptRide,
+  getActiveRide,
+  getRideHistory,
+  getEarnings,
+  mapTripToActiveRide,
+  mapTripToRideHistory,
+  Trip,
+} from "../../services/driver";
 
 const { width, height } = Dimensions.get("window");
 
@@ -47,6 +56,9 @@ export default function Home() {
     declineRide,
     currentLocation,
     setCurrentLocation,
+    setActiveRide,
+    setRideHistory,
+    updateStats,
   } = useDriverStore();
 
   const { driver } = useAuthStore();
@@ -93,6 +105,39 @@ export default function Home() {
     }
   }, [isOnline, rideRequest]);
 
+  // Fetch active ride, ride history, and earnings when driver is logged in
+  useEffect(() => {
+    if (!driver?._id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [active, historyRes, earnings] = await Promise.all([
+          getActiveRide(),
+          getRideHistory({ limit: 50 }),
+          getEarnings(),
+        ]);
+        if (cancelled) return;
+        if (active) setActiveRide(mapTripToActiveRide(active));
+        if (historyRes?.rides?.length) setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+        if (earnings) {
+          updateStats({
+            todayEarnings: earnings.todayEarnings ?? 0,
+            todayRides: earnings.todayRides ?? 0,
+            weeklyEarnings: earnings.weeklyEarnings ?? 0,
+            monthlyEarnings: earnings.monthlyEarnings ?? 0,
+            totalDebt: earnings.totalDebt ?? 0,
+            totalEarnings: earnings.totalEarnings ?? 0,
+            netBalance: earnings.netBalance ?? 0,
+          });
+        }
+        if (active) router.replace("/(root)/active-ride");
+      } catch (_) {
+        // Ignore; user may be offline or API not ready
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [driver?._id]);
+
   // Listen for ride requests via Socket.IO
   useEffect(() => {
     const handleNewRideRequest = (trip: Trip) => {
@@ -138,41 +183,7 @@ export default function Home() {
     };
   }, [isOnline, driver?._id]);
 
-  // Fallback simulation for demo when no backend connection
-  useEffect(() => {
-    if (isOnline && !rideRequest) {
-      const timer = setTimeout(() => {
-        // Only simulate if no real request came in after 10 seconds
-        if (!useDriverStore.getState().rideRequest) {
-          console.log("No socket request, running demo simulation...");
-          const mockRequest: RideRequest = {
-            id: "demo-123",
-            customerId: "c1",
-            customerName: "Alice Walker",
-            customerRating: 4.8,
-            customerPhone: "+257 71 234 567",
-            pickupLocation: {
-              address: "Boulevard de l'Uprona, Bujumbura",
-              coordinates: { latitude: -3.38, longitude: 29.36 },
-            },
-            dropoffLocation: {
-              address: "Avenue du Large, Bujumbura",
-              coordinates: { latitude: -3.4, longitude: 29.35 },
-            },
-            estimatedFare: 12500,
-            distance: 4.2,
-            duration: 12,
-            requestTime: new Date().toISOString(),
-          };
-          setCurrentTripId("demo-123");
-          setRideRequest(mockRequest);
-        }
-      }, 10000); // 10 seconds delay for fallback
-      return () => clearTimeout(timer);
-    }
-  }, [isOnline, rideRequest]);
-
-  // Set initial location for demo
+  // Set initial location when none (e.g. first load)
   useEffect(() => {
     if (!currentLocation) {
       setCurrentLocation({
@@ -183,17 +194,12 @@ export default function Home() {
   }, []);
 
   const handleAccept = async () => {
-    if (!currentTripId) {
-      // Fallback for demo mode
-      acceptRide();
-      router.push("/(root)/active-ride");
-      return;
-    }
-
+    if (!currentTripId) return;
     try {
-      // Call API to accept the ride
-      await apiAcceptRide(currentTripId);
-      acceptRide();
+      const trip = await apiAcceptRide(currentTripId);
+      setActiveRide(mapTripToActiveRide(trip));
+      setRideRequest(null);
+      setCurrentTripId(null);
       router.push("/(root)/active-ride");
     } catch (error: any) {
       useAlertStore.getState().showAlert({
@@ -308,9 +314,8 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Map View Background */}
-      <MapView
-        provider={PROVIDER_GOOGLE}
+      {/* Map View Background (Mapbox) */}
+      <MapboxMap
         style={styles.map}
         initialRegion={{
           latitude: -3.3822,
@@ -318,8 +323,11 @@ export default function Home() {
           latitudeDelta: 0.0122,
           longitudeDelta: 0.0069,
         }}
-        showsUserLocation={true}
-        followsUserLocation={true}
+        userLocation={
+          currentLocation
+            ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
+            : null
+        }
       />
 
       {/* Online Status Overlay (Searching Pulse) */}

@@ -16,6 +16,8 @@
   "login_subtitle": "Connectez-vous pour commencer à accepter des courses et gagner aujourd'hui",
   "enter_phone": "Entrez votre numéro de téléphone",
   "enter_pin": "Entrez votre code PIN à 4 chiffres",
+  "enter_email": "Entrez votre adresse email",
+  "enter_password": "Entrez votre mot de passe",
   "forgot_pin": "Code PIN oublié ?",
 
   "go_online": "Passer en ligne",

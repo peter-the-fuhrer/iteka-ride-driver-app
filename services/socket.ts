@@ -68,20 +68,20 @@ export const initSocket = async (): Promise<Socket | null> => {
 // Get current socket instance
 export const getSocket = (): Socket | null => socket;
 
-// Join driver room to receive ride requests
+// Join driver room to receive ride requests (backend accepts string or { driverId })
 export const joinDriverRoom = (driverId: string) => {
   if (socket?.connected) {
-    socket.emit("join_driver", { driverId });
+    socket.emit("join_driver", driverId);
     console.log("Joined driver room:", driverId);
   } else {
     console.warn("Socket not connected, cannot join driver room");
   }
 };
 
-// Update driver location
-export const updateLocation = (lat: number, lng: number) => {
+// Update driver location (sent to backend, then forwarded to rider's ride room)
+export const updateLocation = (driverId: string, lat: number, lng: number) => {
   if (socket?.connected) {
-    socket.emit("update_location", { lat, lng });
+    socket.emit("update_location", { driverId, lat, lng });
   }
 };
 

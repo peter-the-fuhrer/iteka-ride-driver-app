@@ -5,7 +5,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import {
@@ -19,6 +21,7 @@ import {
 import { Colors } from "../../constants/Colors";
 import { useRouter } from "expo-router";
 import { useDriverStore } from "../../store/driverStore";
+import { getEarnings, getRideHistory, mapTripToRideHistory } from "../../services/driver";
 
 const { width } = Dimensions.get("window");
 
@@ -26,12 +29,51 @@ export default function Wallet() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const router = useRouter();
-  const { stats, rideHistory } = useDriverStore();
+  const { stats, rideHistory, updateStats, setRideHistory } = useDriverStore();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [earnings, historyRes] = await Promise.all([
+          getEarnings(),
+          getRideHistory({ limit: 50 }),
+        ]);
+        if (!cancelled) {
+          if (earnings) {
+            updateStats({
+              todayEarnings: earnings.todayEarnings ?? 0,
+              todayRides: earnings.todayRides ?? 0,
+              weeklyEarnings: earnings.weeklyEarnings ?? 0,
+              monthlyEarnings: earnings.monthlyEarnings ?? 0,
+              totalDebt: earnings.totalDebt ?? 0,
+              totalEarnings: earnings.totalEarnings ?? 0,
+              netBalance: earnings.netBalance ?? 0,
+            });
+          }
+          if (historyRes?.rides?.length) {
+            setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+          }
+        }
+      } catch (_) {}
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Filter only completed rides for wallet transactions
   const completedRides = rideHistory.filter(
     (ride) => ride.status === "completed",
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

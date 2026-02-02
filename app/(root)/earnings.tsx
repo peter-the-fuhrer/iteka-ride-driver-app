@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -13,29 +14,59 @@ import { DollarSign, TrendingUp, Clock, Calendar } from "lucide-react-native";
 import { Svg, Rect, Text as SvgText, G } from "react-native-svg";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore } from "../../store/driverStore";
+import { getEarnings, getRideHistory, mapTripToRideHistory } from "../../services/driver";
 
 const { width } = Dimensions.get("window");
 
 const CHART_HEIGHT = 180;
 const CHART_WIDTH = width - 40;
 
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 export default function Earnings() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { stats, rideHistory } = useDriverStore();
+  const { stats, rideHistory, updateStats, setRideHistory } = useDriverStore();
+  const [loading, setLoading] = useState(false);
 
-  // Mock Weekly Data
-  const weeklyData = [
-    { day: "Mon", amount: 45000 },
-    { day: "Tue", amount: 62000 },
-    { day: "Wed", amount: 38000 },
-    { day: "Thu", amount: 85000 },
-    { day: "Fri", amount: 92000 },
-    { day: "Sat", amount: 115000 },
-    { day: "Sun", amount: 78000 },
-  ];
+  // Refresh earnings and history when screen mounts
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const [earnings, historyRes] = await Promise.all([
+          getEarnings(),
+          getRideHistory({ limit: 50 }),
+        ]);
+        if (cancelled) return;
+        if (earnings) updateStats({
+          todayEarnings: earnings.todayEarnings ?? 0,
+          todayRides: earnings.todayRides ?? 0,
+          weeklyEarnings: earnings.weeklyEarnings ?? 0,
+          monthlyEarnings: earnings.monthlyEarnings ?? 0,
+          totalDebt: earnings.totalDebt ?? 0,
+          totalEarnings: earnings.totalEarnings ?? 0,
+          netBalance: earnings.netBalance ?? 0,
+        });
+        if (historyRes?.rides?.length) setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+      } catch (_) {}
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  const maxAmount = Math.max(...weeklyData.map((d) => d.amount));
+  // Weekly chart: no per-day breakdown from API, show flat distribution for display
+  const weeklyData = useMemo(
+    () =>
+      DAY_LABELS.map((day, i) => ({
+        day,
+        amount: stats.weeklyEarnings > 0 ? Math.round(stats.weeklyEarnings / 7) : 0,
+      })),
+    [stats.weeklyEarnings]
+  );
+
+  const maxAmount = Math.max(1, ...weeklyData.map((d) => d.amount));
 
   const Chart = () => {
     const barWidth = (CHART_WIDTH - 40) / weeklyData.length;
@@ -55,9 +86,7 @@ export default function Earnings() {
                   width={actualBarWidth}
                   height={barHeight}
                   rx={4}
-                  fill={
-                    item.amount === 115000 ? Colors.primary : Colors.gray[200]
-                  }
+                  fill={item.amount > 0 ? Colors.primary : Colors.gray[200]}
                 />
                 <SvgText
                   x={index * barWidth + 20 + actualBarWidth / 2}
@@ -76,6 +105,14 @@ export default function Earnings() {
       </View>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -98,12 +135,12 @@ export default function Earnings() {
           <Text style={styles.summaryAmount}>
             {stats.weeklyEarnings.toLocaleString()} FBU
           </Text>
-          <View style={styles.trendRow}>
-            <TrendingUp size={16} color={Colors.success} />
-            <Text style={styles.trendText}>
-              {t("trend_up_comparison", { percent: 12 })}
-            </Text>
-          </View>
+          {stats.weeklyEarnings > 0 && (
+            <View style={styles.trendRow}>
+              <TrendingUp size={16} color={Colors.success} />
+              <Text style={styles.trendText}>{t("this_week")}</Text>
+            </View>
+          )}
         </View>
 
         {/* Chart */}

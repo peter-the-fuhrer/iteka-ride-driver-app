@@ -17,16 +17,23 @@ import {
   CheckCircle2,
   XCircle,
   User,
-  CarFront,
 } from "lucide-react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from "react-native-maps";
+import MapboxMap, { type MapboxMapRef } from "../../components/Map/MapboxMap";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore } from "../../store/driverStore";
+import { useAuthStore } from "../../store/authStore";
 import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState, useEffect } from "react";
-import { updateRideState } from "../../services/driver";
+import * as Location from "expo-location";
+import {
+  updateRideState,
+  getEarnings,
+  getRideHistory,
+  mapTripToRideHistory,
+} from "../../services/driver";
+import { updateLocation } from "../../services/socket";
 
 const { width, height } = Dimensions.get("window");
 
@@ -39,11 +46,16 @@ export default function ActiveRide() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const router = useRouter();
-  const { activeRide, updateRideStatus, completeRide, cancelRide } =
-    useDriverStore();
+  const { driver } = useAuthStore();
+  const {
+    activeRide,
+    updateRideStatus,
+    setActiveRide,
+    setRideHistory,
+    updateStats,
+  } = useDriverStore();
 
-  // Driver Location Simulation State
-  // Initialize slightly away from pickup to simulate approach
+  // Driver location: real GPS when available, fallback to pickup offset
   const [driverLocation, setDriverLocation] = useState({
     latitude: -3.385,
     longitude: 29.362,
@@ -60,7 +72,7 @@ export default function ActiveRide() {
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["45%", "80%"], []);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<MapboxMapRef>(null);
 
   // Fetch route from OpenRouteService
   useEffect(() => {
@@ -125,76 +137,93 @@ export default function ActiveRide() {
     fetchRoute();
   }, [activeRide?.status, driverLocation]);
 
-  // Initialize driver location based on ride when loaded
+  // Initialize driver location from ride when loaded (fallback until GPS available)
   useEffect(() => {
     if (activeRide && activeRide.status === "accepted") {
-      // Set simulated start point 0.005 deg away
       setDriverLocation({
         latitude: activeRide.pickupLocation.coordinates.latitude - 0.005,
         longitude: activeRide.pickupLocation.coordinates.longitude - 0.005,
       });
     } else if (activeRide && activeRide.status === "started") {
-      // If reloading in started state, start at pickup
       setDriverLocation(activeRide.pickupLocation.coordinates);
     }
-  }, []); // Run once on mount
+  }, [activeRide?.id]);
 
-  // Simulation Logic - Move car along route coordinates
+  // Real GPS: send driver location to backend so rider sees driver on map
+  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!activeRide || !driver?._id) return;
+
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+
+      const update = async () => {
+        try {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          const { latitude, longitude } = loc.coords;
+          setDriverLocation({ latitude, longitude });
+          updateLocation(driver._id, latitude, longitude);
+        } catch (e) {
+          console.warn("Active ride location update failed:", e);
+        }
+      };
+
+      await update();
+      locationIntervalRef.current = setInterval(update, 5000);
+    })();
+
+    return () => {
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+        locationIntervalRef.current = null;
+      }
+    };
+  }, [activeRide?.id, driver?._id]);
+
+  // Optional: animate car heading from route when we have route coords (for map rotation)
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
-
   useEffect(() => {
     if (!activeRide || routeCoordinates.length < 2) return;
     if (activeRide.status !== "accepted" && activeRide.status !== "started")
       return;
 
     const interval = setInterval(() => {
-      setCurrentRouteIndex((prevIndex) => {
-        // If we've reached the end of the route, stop
-        if (prevIndex >= routeCoordinates.length - 1) {
-          return prevIndex;
+      setCurrentRouteIndex((prev) => {
+        if (prev >= routeCoordinates.length - 1) return prev;
+        const next = prev + 1;
+        const cur = routeCoordinates[prev];
+        const nxt = routeCoordinates[next];
+        if (cur && nxt) {
+          const deltaLng = nxt.longitude - cur.longitude;
+          const deltaLat = nxt.latitude - cur.latitude;
+          setCarHeading(Math.atan2(deltaLng, deltaLat) * (180 / Math.PI));
         }
-
-        // Move to next coordinate in the route
-        const nextIndex = prevIndex + 1;
-        const currentCoord = routeCoordinates[prevIndex];
-        const nextCoord = routeCoordinates[nextIndex];
-
-        if (nextCoord && currentCoord) {
-          // Calculate heading (bearing) from current to next point
-          const deltaLng = nextCoord.longitude - currentCoord.longitude;
-          const deltaLat = nextCoord.latitude - currentCoord.latitude;
-          const heading = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
-
-          setCarHeading(heading);
-          setDriverLocation(nextCoord);
-        }
-
-        return nextIndex;
+        return next;
       });
-    }, 1000); // Move to next point every second
-
+    }, 1000);
     return () => clearInterval(interval);
   }, [activeRide?.status, routeCoordinates]);
-
-  // Reset route index when route changes
   useEffect(() => {
     setCurrentRouteIndex(0);
   }, [routeCoordinates]);
 
-  // Camera Follower
+  // Camera Follower (Mapbox flyTo)
   useEffect(() => {
     if (driverLocation && mapRef.current) {
-      mapRef.current.animateCamera(
+      mapRef.current.animateToRegion(
         {
-          center: driverLocation,
-          zoom: 18.5, // Closer zoom for better street-level navigation
-          pitch: 45, // 3D perspective
-          heading: carHeading, // Rotate map to match car direction
+          latitude: driverLocation.latitude,
+          longitude: driverLocation.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
         },
-        { duration: 1000 },
+        500
       );
     }
-  }, [driverLocation, carHeading]);
+  }, [driverLocation]);
 
   if (!activeRide) {
     return (
@@ -226,16 +255,10 @@ export default function ActiveRide() {
 
     try {
       if (activeRide.status === "accepted") {
-        // Call API to update status to driver_arrived
-        if (!tripId.startsWith("demo-")) {
-          await updateRideState(tripId, "driver_arrived");
-        }
+        await updateRideState(tripId, "driver_arrived");
         updateRideStatus("arrived");
       } else if (activeRide.status === "arrived") {
-        // Call API to update status to ongoing
-        if (!tripId.startsWith("demo-")) {
-          await updateRideState(tripId, "ongoing");
-        }
+        await updateRideState(tripId, "ongoing");
         updateRideStatus("started");
       } else if (activeRide.status === "started") {
         setIsActionLoading(false);
@@ -249,11 +272,28 @@ export default function ActiveRide() {
               text: t("yes_complete"),
               onPress: async () => {
                 try {
-                  // Call API to update status to completed
-                  if (!tripId.startsWith("demo-")) {
-                    await updateRideState(tripId, "completed");
-                  }
-                  completeRide(activeRide.estimatedFare);
+                  await updateRideState(tripId, "completed");
+                  setActiveRide(null);
+                  try {
+                    const [earnings, historyRes] = await Promise.all([
+                      getEarnings(),
+                      getRideHistory({ limit: 50 }),
+                    ]);
+                    if (earnings) {
+                      updateStats({
+                        todayEarnings: earnings.todayEarnings ?? 0,
+                        todayRides: earnings.todayRides ?? 0,
+                        weeklyEarnings: earnings.weeklyEarnings ?? 0,
+                        monthlyEarnings: earnings.monthlyEarnings ?? 0,
+                        totalDebt: earnings.totalDebt ?? 0,
+                        totalEarnings: earnings.totalEarnings ?? 0,
+                        netBalance: earnings.netBalance ?? 0,
+                      });
+                    }
+                    if (historyRes?.rides?.length) {
+                      setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+                    }
+                  } catch (_) {}
                   router.replace("/(root)");
                 } catch (error: any) {
                   useAlertStore.getState().showAlert({
@@ -292,11 +332,14 @@ export default function ActiveRide() {
           onPress: async () => {
             try {
               const tripId = activeRide.id;
-              // Call API to cancel (could use updateRideState with cancelled status)
-              if (!tripId.startsWith("demo-")) {
-                await updateRideState(tripId, "cancelled");
-              }
-              cancelRide();
+              await updateRideState(tripId, "cancelled");
+              setActiveRide(null);
+              try {
+                const historyRes = await getRideHistory({ limit: 50 });
+                if (historyRes?.rides?.length) {
+                  setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+                }
+              } catch (_) {}
               router.replace("/(root)");
             } catch (error: any) {
               useAlertStore.getState().showAlert({
@@ -345,57 +388,25 @@ export default function ActiveRide() {
 
   return (
     <View style={styles.container}>
-      {/* Map */}
-      <MapView
+      {/* Map (Mapbox) */}
+      <MapboxMap
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
         style={styles.map}
-        mapPadding={{ top: 0, right: 0, bottom: height * 0.45, left: 0 }}
         initialRegion={{
           latitude: driverLocation.latitude,
           longitude: driverLocation.longitude,
           latitudeDelta: 0.005,
           longitudeDelta: 0.005,
         }}
-      >
-        {/* Driver Marker */}
-        <Marker
-          coordinate={driverLocation}
-          anchor={{ x: 0.5, y: 0.5 }}
-          flat
-          rotation={carHeading}
-        >
-          <View style={styles.carMarker}>
-            <CarFront size={20} color={Colors.white} fill={Colors.white} />
-          </View>
-        </Marker>
-
-        {/* Pickup Marker */}
-        {activeRide.status !== "started" && (
-          <Marker
-            coordinate={activeRide.pickupLocation.coordinates}
-            title={t("pickup_location")}
-            pinColor={Colors.info}
-          />
-        )}
-
-        {/* Dropoff Marker */}
-        <Marker
-          coordinate={activeRide.dropoffLocation.coordinates}
-          title={t("dropoff_location")}
-          pinColor={Colors.black}
-        />
-
-        {/* Route Line from OpenRouteService */}
-        {routeCoordinates.length > 0 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor={Colors.primary}
-            strokeWidth={5}
-            lineDashPattern={[0]}
-          />
-        )}
-      </MapView>
+        userLocation={driverLocation}
+        pickup={
+          activeRide.status !== "started"
+            ? activeRide.pickupLocation.coordinates
+            : null
+        }
+        dropoff={activeRide.dropoffLocation.coordinates}
+        routeCoordinates={routeCoordinates}
+      />
 
       {/* Header */}
       <View style={[styles.header, { top: insets.top }]}>
@@ -550,17 +561,6 @@ const styles = StyleSheet.create({
   },
   map: {
     ...StyleSheet.absoluteFillObject,
-  },
-  carMarker: {
-    backgroundColor: Colors.black,
-    padding: 6,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: Colors.white,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   header: {
     position: "absolute",
