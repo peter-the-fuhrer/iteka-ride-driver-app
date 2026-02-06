@@ -18,6 +18,8 @@ export interface Trip {
   _id: string;
   client_id: TripClient | string;
   driver_id?: string;
+  ride_type_id?: string | { _id: string; name: string; is_ride: boolean; is_delivery: boolean };
+  trip_type?: "ride" | "delivery";
   pickup: {
     address: string;
     lat: number;
