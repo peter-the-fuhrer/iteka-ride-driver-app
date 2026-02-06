@@ -4,35 +4,38 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { Clock, MapPin, Calendar, ChevronRight } from "lucide-react-native";
-import { Colors } from "../../constants/Colors";
 import { useDriverStore, RideHistory } from "../../store/driverStore";
-import { useRef, useState } from "react";
-import { BottomSheetModal } from "@gorhom/bottom-sheet";
-import { RideDetailsModal } from "../../components/home/RideDetailsModal";
+import { Colors } from "../../constants/Colors";
+import { getRideHistory, mapTripToRideHistory } from "../../services/driver";
 
 export default function History() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { rideHistory } = useDriverStore();
+  const { rideHistory, setRideHistory } = useDriverStore();
+  const [loading, setLoading] = useState(true);
 
-  const detailsModalRef = useRef<BottomSheetModal>(null);
-  const [selectedRide, setSelectedRide] = useState<RideHistory | null>(null);
-
-  const handleRidePress = (ride: RideHistory) => {
-    setSelectedRide(ride);
-    detailsModalRef.current?.present();
-  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getRideHistory({ limit: 50 });
+        if (!cancelled && res?.rides?.length) {
+          setRideHistory(res.rides.map(mapTripToRideHistory));
+        }
+      } catch (_) {}
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const renderItem = ({ item }: { item: RideHistory }) => (
-    <TouchableOpacity
-      style={styles.rideItem}
-      activeOpacity={0.7}
-      onPress={() => handleRidePress(item)}
-    >
+    <TouchableOpacity style={styles.rideItem} activeOpacity={0.7}>
       <View style={styles.rideHeader}>
         <View style={styles.dateContainer}>
           <Calendar size={14} color={Colors.gray[500]} />
@@ -81,6 +84,14 @@ export default function History() {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -100,12 +111,6 @@ export default function History() {
           contentContainerStyle={styles.listContent}
         />
       )}
-
-      <RideDetailsModal
-        ref={detailsModalRef}
-        ride={selectedRide}
-        onClose={() => detailsModalRef.current?.dismiss()}
-      />
     </View>
   );
 }

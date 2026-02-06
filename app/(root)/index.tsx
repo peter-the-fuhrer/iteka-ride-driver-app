@@ -9,16 +9,33 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
+import MapboxMap from "../../components/Map/MapboxMap";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Power } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore, RideRequest } from "../../store/driverStore";
+import { useAuthStore } from "../../store/authStore";
 import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import RideRequestCard from "../../components/home/RideRequestCard";
 import GoButton from "../../components/common/GoButton";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import {
+  subscribeToEvent,
+  unsubscribeFromEvent,
+  joinDriverRoom,
+  updateLocation as socketUpdateLocation,
+} from "../../services/socket";
+import {
+  updateStatus,
+  acceptRide as apiAcceptRide,
+  getActiveRide,
+  getRideHistory,
+  getEarnings,
+  mapTripToActiveRide,
+  mapTripToRideHistory,
+  Trip,
+} from "../../services/driver";
 
 const { width, height } = Dimensions.get("window");
 
@@ -39,7 +56,13 @@ export default function Home() {
     declineRide,
     currentLocation,
     setCurrentLocation,
+    setActiveRide,
+    setRideHistory,
+    updateStats,
   } = useDriverStore();
+
+  const { driver } = useAuthStore();
+  const [currentTripId, setCurrentTripId] = useState<string | null>(null);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -82,36 +105,85 @@ export default function Home() {
     }
   }, [isOnline, rideRequest]);
 
-  // Simulate ride request for demo purposes
+  // Fetch active ride, ride history, and earnings when driver is logged in
   useEffect(() => {
-    if (isOnline && !rideRequest) {
-      const timer = setTimeout(() => {
-        const mockRequest: RideRequest = {
-          id: "123",
-          customerId: "c1",
-          customerName: "Alice Walker",
-          customerRating: 4.8,
-          customerPhone: "+257 71 234 567",
-          pickupLocation: {
-            address: "Boulevard de l'Uprona, Bujumbura",
-            coordinates: { latitude: -3.38, longitude: 29.36 },
-          },
-          dropoffLocation: {
-            address: "Avenue du Large, Bujumbura",
-            coordinates: { latitude: -3.4, longitude: 29.35 },
-          },
-          estimatedFare: 12500,
-          distance: 4.2,
-          duration: 12,
-          requestTime: new Date().toISOString(),
-        };
-        setRideRequest(mockRequest);
-      }, 5000); // 5 seconds delay
-      return () => clearTimeout(timer);
-    }
-  }, [isOnline, rideRequest]);
+    if (!driver?._id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [active, historyRes, earnings] = await Promise.all([
+          getActiveRide(),
+          getRideHistory({ limit: 50 }),
+          getEarnings(),
+        ]);
+        if (cancelled) return;
+        if (active) setActiveRide(mapTripToActiveRide(active));
+        if (historyRes?.rides?.length) setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+        if (earnings) {
+          updateStats({
+            todayEarnings: earnings.todayEarnings ?? 0,
+            todayRides: earnings.todayRides ?? 0,
+            weeklyEarnings: earnings.weeklyEarnings ?? 0,
+            monthlyEarnings: earnings.monthlyEarnings ?? 0,
+            totalDebt: earnings.totalDebt ?? 0,
+            totalEarnings: earnings.totalEarnings ?? 0,
+            netBalance: earnings.netBalance ?? 0,
+          });
+        }
+        if (active) router.replace("/(root)/active-ride");
+      } catch (_) {
+        // Ignore; user may be offline or API not ready
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [driver?._id]);
 
-  // Set initial location for demo
+  // Listen for ride requests via Socket.IO
+  useEffect(() => {
+    const handleNewRideRequest = (trip: Trip) => {
+      console.log("New ride request received:", trip);
+
+      // Convert backend Trip to RideRequest format
+      const clientData = typeof trip.client_id === 'object' ? trip.client_id : null;
+
+      const request: RideRequest = {
+        id: trip._id,
+        customerId: clientData?._id || (typeof trip.client_id === 'string' ? trip.client_id : ''),
+        customerName: clientData?.name || "Customer",
+        customerRating: clientData?.rating || 4.5,
+        customerPhone: clientData?.phone || "",
+        pickupLocation: {
+          address: trip.pickup.address,
+          coordinates: { latitude: trip.pickup.lat, longitude: trip.pickup.lng },
+        },
+        dropoffLocation: {
+          address: trip.destination.address,
+          coordinates: { latitude: trip.destination.lat, longitude: trip.destination.lng },
+        },
+        estimatedFare: trip.price,
+        distance: trip.distance / 1000, // Convert to km
+        duration: Math.round(trip.distance / 500), // Estimate duration
+        requestTime: trip.createdAt,
+      };
+
+      setCurrentTripId(trip._id);
+      setRideRequest(request);
+    };
+
+    if (isOnline) {
+      // Join driver room to receive ride requests
+      if (driver?._id) {
+        joinDriverRoom(driver._id);
+      }
+      subscribeToEvent("new_ride_request", handleNewRideRequest);
+    }
+
+    return () => {
+      unsubscribeFromEvent("new_ride_request", handleNewRideRequest);
+    };
+  }, [isOnline, driver?._id]);
+
+  // Set initial location when none (e.g. first load)
   useEffect(() => {
     if (!currentLocation) {
       setCurrentLocation({
@@ -121,9 +193,21 @@ export default function Home() {
     }
   }, []);
 
-  const handleAccept = () => {
-    acceptRide();
-    router.push("/(root)/active-ride");
+  const handleAccept = async () => {
+    if (!currentTripId) return;
+    try {
+      const trip = await apiAcceptRide(currentTripId);
+      setActiveRide(mapTripToActiveRide(trip));
+      setRideRequest(null);
+      setCurrentTripId(null);
+      router.push("/(root)/active-ride");
+    } catch (error: any) {
+      useAlertStore.getState().showAlert({
+        title: t("error") || "Error",
+        message: error.message || "Could not accept ride",
+        type: "error",
+      });
+    }
   };
 
   const handleGoOnline = () => {
@@ -135,7 +219,26 @@ export default function Home() {
         { text: t("cancel"), style: "cancel" },
         {
           text: t("yes_go_online"),
-          onPress: () => setOnlineStatus(true),
+          onPress: async () => {
+            try {
+              // Call API to update status
+              await updateStatus({
+                is_online: true,
+                lat: currentLocation?.latitude,
+                lng: currentLocation?.longitude,
+              });
+              setOnlineStatus(true);
+
+              // Join driver room for ride requests
+              if (driver?._id) {
+                joinDriverRoom(driver._id);
+              }
+            } catch (error: any) {
+              console.error("Failed to go online:", error);
+              // Still set online locally for demo
+              setOnlineStatus(true);
+            }
+          },
         },
       ],
     });
@@ -151,7 +254,17 @@ export default function Home() {
         {
           text: t("yes_go_offline"),
           style: "destructive",
-          onPress: () => setOnlineStatus(false),
+          onPress: async () => {
+            try {
+              // Call API to update status
+              await updateStatus({ is_online: false });
+              setOnlineStatus(false);
+            } catch (error: any) {
+              console.error("Failed to go offline:", error);
+              // Still set offline locally
+              setOnlineStatus(false);
+            }
+          },
         },
       ],
     });
@@ -201,9 +314,8 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Map View Background */}
-      <MapView
-        provider={PROVIDER_GOOGLE}
+      {/* Map View Background (Mapbox) */}
+      <MapboxMap
         style={styles.map}
         initialRegion={{
           latitude: -3.3822,
@@ -211,8 +323,11 @@ export default function Home() {
           latitudeDelta: 0.0122,
           longitudeDelta: 0.0069,
         }}
-        showsUserLocation={true}
-        followsUserLocation={true}
+        userLocation={
+          currentLocation
+            ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
+            : null
+        }
       />
 
       {/* Online Status Overlay (Searching Pulse) */}
