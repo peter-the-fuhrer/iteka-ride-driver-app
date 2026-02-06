@@ -25,7 +25,7 @@ const API_URL_PROD = "https://iteka-ride-backend.onrender.com/api";
 // ============================================
 // ACTIVE ENVIRONMENT – use local for emulators
 // ============================================
-const IS_PRODUCTION = false; // true = production, false = local (emulators / device)
+const IS_PRODUCTION = true; // true = production, false = local (emulators / device)
 
 export const API_BASE_URL = IS_PRODUCTION ? API_URL_PROD : API_URL_LOCAL;
 export const SOCKET_URL = IS_PRODUCTION
