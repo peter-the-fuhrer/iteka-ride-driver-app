@@ -19,7 +19,6 @@ import {
   Shield,
   Bell,
   Languages,
-  Moon,
   Wallet,
   HelpCircle,
 } from "lucide-react-native";
@@ -47,12 +46,12 @@ export default function Profile() {
         // Try to get full driver profile - if endpoint doesn't exist, use driver from auth store
         const response = await api.get(`/drivers/${driver._id}`);
         setDriverProfile(response.data);
-        
+
         // Check document status
         const docs = response.data?.documents || {};
         const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
         const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
-        
+
         if (hasAllDocs) {
           setDocumentsStatus(t("verified") || "Verified");
         } else if (hasSomeDocs) {
@@ -66,7 +65,7 @@ export default function Profile() {
         const docs = driver?.documents || {};
         const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
         const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
-        
+
         if (hasAllDocs) {
           setDocumentsStatus(t("verified") || "Verified");
         } else if (hasSomeDocs) {
@@ -97,7 +96,14 @@ export default function Profile() {
         <View style={styles.iconWrapper}>
           <Icon size={20} color={Colors.gray[600]} />
         </View>
-        <Text style={styles.itemLabel}>{label}</Text>
+        <View style={styles.itemLabelValueWrap}>
+          <Text style={styles.itemLabel}>{label}</Text>
+          {value ? (
+            <Text style={styles.itemValue} numberOfLines={1} ellipsizeMode="tail">
+              {value}
+            </Text>
+          ) : null}
+        </View>
       </View>
       <View style={styles.itemRight}>
         {isSwitch ? (
@@ -107,10 +113,7 @@ export default function Profile() {
             trackColor={{ false: Colors.gray[200], true: Colors.primary }}
           />
         ) : (
-          <>
-            {value && <Text style={styles.itemValue}>{value}</Text>}
-            <ChevronRight size={20} color={Colors.gray[400]} />
-          </>
+          <ChevronRight size={20} color={Colors.gray[400]} />
         )}
       </View>
     </TouchableOpacity>
@@ -130,8 +133,8 @@ export default function Profile() {
       return driver.vehicle_plate;
     }
     if (driverProfile?.vehicle_type || driver?.vehicle_type) {
-      return (driverProfile?.vehicle_type || driver?.vehicle_type)?.charAt(0).toUpperCase() + 
-             (driverProfile?.vehicle_type || driver?.vehicle_type)?.slice(1);
+      return (driverProfile?.vehicle_type || driver?.vehicle_type)?.charAt(0).toUpperCase() +
+        (driverProfile?.vehicle_type || driver?.vehicle_type)?.slice(1);
     }
     return t("no_vehicle") || "No Vehicle";
   };
@@ -208,12 +211,6 @@ export default function Profile() {
             label={t("language")}
             value={i18n.language.toUpperCase()}
             onPress={toggleLanguage}
-          />
-          <ProfileItem
-            icon={Moon}
-            label={t("dark_mode")}
-            isSwitch
-            switchValue={false}
           />
         </View>
 
@@ -325,6 +322,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+  },
+  itemLabelValueWrap: {
+    flex: 1,
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: 2,
+    minWidth: 0,
   },
   iconWrapper: {
     width: 36,
@@ -348,6 +353,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins_400Regular",
     color: Colors.gray[500],
+    marginTop: 2,
   },
   logoutButton: {
     flexDirection: "row",
