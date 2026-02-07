@@ -26,12 +26,58 @@ import {
 import { Colors } from "../../constants/Colors";
 import { useRouter } from "expo-router";
 import { useDriverStore } from "../../store/driverStore";
+import { useAuthStore } from "../../store/authStore";
+import { useEffect, useState } from "react";
+import api from "../../services/api";
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { stats } = useDriverStore();
+  const { driver } = useAuthStore();
+  const [driverProfile, setDriverProfile] = useState<any>(null);
+  const [documentsStatus, setDocumentsStatus] = useState<string>("");
+
+  // Fetch full driver profile with documents
+  useEffect(() => {
+    const fetchDriverProfile = async () => {
+      if (!driver?._id) return;
+      try {
+        // Try to get full driver profile - if endpoint doesn't exist, use driver from auth store
+        const response = await api.get(`/drivers/${driver._id}`);
+        setDriverProfile(response.data);
+        
+        // Check document status
+        const docs = response.data?.documents || {};
+        const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
+        const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
+        
+        if (hasAllDocs) {
+          setDocumentsStatus(t("verified") || "Verified");
+        } else if (hasSomeDocs) {
+          setDocumentsStatus(t("pending") || "Pending");
+        } else {
+          setDocumentsStatus(t("action_required") || "Action Required");
+        }
+      } catch (error) {
+        // If endpoint doesn't exist or fails, use driver from auth store
+        console.log("Could not fetch full profile, using auth store data");
+        const docs = driver?.documents || {};
+        const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
+        const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
+        
+        if (hasAllDocs) {
+          setDocumentsStatus(t("verified") || "Verified");
+        } else if (hasSomeDocs) {
+          setDocumentsStatus(t("pending") || "Pending");
+        } else {
+          setDocumentsStatus(t("action_required") || "Action Required");
+        }
+      }
+    };
+    fetchDriverProfile();
+  }, [driver?._id, t]);
 
   const ProfileItem = ({
     icon: Icon,
@@ -75,6 +121,21 @@ export default function Profile() {
     i18n.changeLanguage(nextLng);
   };
 
+  // Get vehicle display name
+  const getVehicleDisplay = () => {
+    if (driverProfile?.vehicle_plate) {
+      return driverProfile.vehicle_plate;
+    }
+    if (driver?.vehicle_plate) {
+      return driver.vehicle_plate;
+    }
+    if (driverProfile?.vehicle_type || driver?.vehicle_type) {
+      return (driverProfile?.vehicle_type || driver?.vehicle_type)?.charAt(0).toUpperCase() + 
+             (driverProfile?.vehicle_type || driver?.vehicle_type)?.slice(1);
+    }
+    return t("no_vehicle") || "No Vehicle";
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -95,8 +156,12 @@ export default function Profile() {
               <Text style={styles.editAvatarText}>{t("edit")}</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.driverName}>{t("driver_name_default")}</Text>
-          <Text style={styles.driverRating}>⭐ 4.9 • {t("verified")}</Text>
+          <Text style={styles.driverName}>
+            {driverProfile?.name || driver?.name || t("driver_name_default")}
+          </Text>
+          <Text style={styles.driverRating}>
+            ⭐ {(driverProfile?.rating || driver?.rating || 0).toFixed(1)} • {driver?.status === "active" ? t("verified") : t("pending")}
+          </Text>
         </View>
 
         {/* Info Sections */}
@@ -105,7 +170,7 @@ export default function Profile() {
           <ProfileItem
             icon={User}
             label={t("personal_info")}
-            value="John Doe"
+            value={driverProfile?.name || driver?.name || ""}
           />
           <ProfileItem
             icon={Wallet}
@@ -120,13 +185,13 @@ export default function Profile() {
           <ProfileItem
             icon={Car}
             label={t("my_vehicles")}
-            value="Toyota Corolla"
+            value={getVehicleDisplay()}
             onPress={() => router.push("/vehicles")}
           />
           <ProfileItem
             icon={FileText}
             label={t("documents")}
-            value={t("action_required")}
+            value={documentsStatus}
             onPress={() => router.push("/documents")}
           />
         </View>
@@ -172,6 +237,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,

@@ -9,9 +9,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import MapboxMap from "../../components/Map/MapboxMap";
+import MapboxMap, { type MapboxMapRef, type MapStyleType } from "../../components/Map/MapboxMap";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { Power } from "lucide-react-native";
+import { Power, Layers, LocateFixed } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore, RideRequest } from "../../store/driverStore";
 import { useAuthStore } from "../../store/authStore";
@@ -20,6 +20,7 @@ import { useRouter } from "expo-router";
 import RideRequestCard from "../../components/home/RideRequestCard";
 import GoButton from "../../components/common/GoButton";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import * as Location from "expo-location";
 import {
   subscribeToEvent,
   unsubscribeFromEvent,
@@ -63,8 +64,12 @@ export default function Home() {
 
   const { driver } = useAuthStore();
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
+  const [mapStyle, setMapStyle] = useState<MapStyleType>("streets");
 
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const mapRef = useRef<MapboxMapRef>(null);
+  const hasZoomedToLocation = useRef(false);
 
   // Snap points
   const snapPoints = useMemo(() => {
@@ -183,15 +188,95 @@ export default function Home() {
     };
   }, [isOnline, driver?._id]);
 
-  // Set initial location when none (e.g. first load)
+  // Watch GPS location when driver is online (socket-based: no polling)
   useEffect(() => {
-    if (!currentLocation) {
-      setCurrentLocation({
-        latitude: -3.3822,
-        longitude: 29.3644,
-      });
+    if (!isOnline || !driver?._id) {
+      if (locationSubscriptionRef.current) {
+        locationSubscriptionRef.current.remove();
+        locationSubscriptionRef.current = null;
+      }
+      return;
     }
-  }, []);
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          useAlertStore.getState().showAlert({
+            title: t("error") || "Location Permission Required",
+            message: "Please enable location access in settings to go online.",
+            type: "error",
+          });
+          return;
+        }
+
+        // One-time initial position for map zoom
+        const initial = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (cancelled) return;
+        const { latitude: lat0, longitude: lng0 } = initial.coords;
+        setCurrentLocation({ latitude: lat0, longitude: lng0 });
+        socketUpdateLocation(driver._id, lat0, lng0);
+        if (!hasZoomedToLocation.current && mapRef.current) {
+          hasZoomedToLocation.current = true;
+          mapRef.current.animateToRegion({
+            latitude: lat0,
+            longitude: lng0,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 1000);
+        }
+
+        // Subscribe to location updates (OS-driven: updates on move or at most every 10s)
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 10000,   // at most every 10s when stationary
+            distanceInterval: 15,  // or when moved ~15m (reduces updates when parked)
+          },
+          (loc) => {
+            if (cancelled) return;
+            const { latitude, longitude } = loc.coords;
+            setCurrentLocation({ latitude, longitude });
+            socketUpdateLocation(driver._id, latitude, longitude);
+          }
+        );
+        locationSubscriptionRef.current = sub;
+      } catch (error) {
+        console.error("Error setting up location tracking:", error);
+        if (!currentLocation) {
+          setCurrentLocation({
+            latitude: -3.3822,
+            longitude: 29.3644,
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (locationSubscriptionRef.current) {
+        locationSubscriptionRef.current.remove();
+        locationSubscriptionRef.current = null;
+      }
+    };
+  }, [isOnline, driver?._id]);
+
+  // Zoom to current location when it becomes available
+  useEffect(() => {
+    if (currentLocation && mapRef.current && !hasZoomedToLocation.current) {
+      hasZoomedToLocation.current = true;
+      mapRef.current.animateToRegion({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.01, // Zoom level - smaller = more zoomed in
+        longitudeDelta: 0.01,
+      }, 1000);
+    }
+  }, [currentLocation]);
 
   const handleAccept = async () => {
     if (!currentTripId) return;
@@ -210,38 +295,80 @@ export default function Home() {
     }
   };
 
-  const handleGoOnline = () => {
-    useAlertStore.getState().showAlert({
-      title: t("alert_go_online_title"),
-      message: t("alert_go_online_msg"),
-      type: "info",
-      buttons: [
-        { text: t("cancel"), style: "cancel" },
-        {
-          text: t("yes_go_online"),
-          onPress: async () => {
-            try {
-              // Call API to update status
-              await updateStatus({
-                is_online: true,
-                lat: currentLocation?.latitude,
-                lng: currentLocation?.longitude,
-              });
-              setOnlineStatus(true);
+  const handleGoOnline = async () => {
+    // Request location permission and get current location before going online
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        useAlertStore.getState().showAlert({
+          title: t("error") || "Permission Required",
+          message: "Location permission is required to go online. Please enable location access in settings.",
+          type: "error",
+        });
+        return;
+      }
 
-              // Join driver room for ride requests
-              if (driver?._id) {
-                joinDriverRoom(driver._id);
+      // Get current location
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { latitude, longitude } = loc.coords;
+      setCurrentLocation({ latitude, longitude });
+      
+      // Zoom to location immediately when going online
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.01, // Zoom level - smaller = more zoomed in
+          longitudeDelta: 0.01,
+        }, 1000);
+        hasZoomedToLocation.current = true;
+      }
+
+      // Show confirmation alert
+      useAlertStore.getState().showAlert({
+        title: t("alert_go_online_title"),
+        message: t("alert_go_online_msg"),
+        type: "info",
+        buttons: [
+          { text: t("cancel"), style: "cancel" },
+          {
+            text: t("yes_go_online"),
+            onPress: async () => {
+              try {
+                // Call API to update status with current location
+                await updateStatus({
+                  is_online: true,
+                  lat: latitude,
+                  lng: longitude,
+                });
+                setOnlineStatus(true);
+
+                // Join driver room for ride requests
+                if (driver?._id) {
+                  joinDriverRoom(driver._id);
+                }
+              } catch (error: any) {
+                console.error("Failed to go online:", error);
+                useAlertStore.getState().showAlert({
+                  title: t("error") || "Error",
+                  message: error.message || "Failed to go online",
+                  type: "error",
+                });
               }
-            } catch (error: any) {
-              console.error("Failed to go online:", error);
-              // Still set online locally for demo
-              setOnlineStatus(true);
-            }
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
+    } catch (error: any) {
+      console.error("Error getting location:", error);
+      useAlertStore.getState().showAlert({
+        title: t("error") || "Error",
+        message: "Failed to get your location. Please check location settings.",
+        type: "error",
+      });
+    }
   };
 
   const handleGoOffline = () => {
@@ -316,12 +443,14 @@ export default function Home() {
     <View style={styles.container}>
       {/* Map View Background (Mapbox) */}
       <MapboxMap
+        ref={mapRef}
+        mapStyle={mapStyle}
         style={styles.map}
         initialRegion={{
-          latitude: -3.3822,
-          longitude: 29.3644,
-          latitudeDelta: 0.0122,
-          longitudeDelta: 0.0069,
+          latitude: currentLocation?.latitude ?? -3.3822,
+          longitude: currentLocation?.longitude ?? 29.3644,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
         }}
         userLocation={
           currentLocation
@@ -383,6 +512,40 @@ export default function Home() {
         </View>
       </View>
 
+      {/* Map controls: style + my location */}
+      <View style={styles.mapControls}>
+        <TouchableOpacity
+          style={styles.mapControlButton}
+          onPress={() => {
+            const next: MapStyleType = mapStyle === "streets" ? "satellite" : mapStyle === "satellite" ? "hybrid" : "streets";
+            setMapStyle(next);
+            mapRef.current?.setMapStyle(next);
+          }}
+          activeOpacity={0.8}
+        >
+          <Layers size={22} color={Colors.gray[700]} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.mapControlButton}
+          onPress={() => {
+            if (currentLocation && mapRef.current) {
+              mapRef.current.animateToRegion(
+                {
+                  latitude: currentLocation.latitude,
+                  longitude: currentLocation.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                },
+                800
+              );
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <LocateFixed size={22} color={Colors.gray[700]} />
+        </TouchableOpacity>
+      </View>
+
       {/* Offline GO Button */}
       {!isOnline && (
         <View style={styles.goButtonContainer}>
@@ -428,8 +591,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   map: {
-    width: "100%",
-    height: "100%",
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
   headerContainer: {
     position: "absolute",
@@ -597,5 +760,25 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
     zIndex: 20,
+  },
+  mapControls: {
+    position: "absolute",
+    top: 100,
+    right: 16,
+    zIndex: 15,
+    gap: 8,
+  },
+  mapControlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

@@ -1,11 +1,17 @@
-import { Tabs } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Home, DollarSign, Clock, User } from "lucide-react-native";
 import { Platform } from "react-native";
 import { Colors } from "../../constants/Colors";
+import { useAuthStore } from "../../store/authStore";
 
 export default function RootLayout() {
   const { t } = useTranslation();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Redirect href="/auth/login" />;
+  }
 
   return (
     <Tabs

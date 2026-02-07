@@ -32,6 +32,11 @@ export const SOCKET_URL = IS_PRODUCTION
   ? "https://iteka-ride-backend.onrender.com"
   : SOCKET_URL_LOCAL;
 
+// Log API base URL (always, for debugging)
+console.log("🌐 Driver App API Base URL:", API_BASE_URL);
+console.log("🌐 Driver App Socket URL:", SOCKET_URL);
+console.log("🌐 Driver App Production Mode:", IS_PRODUCTION);
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -76,11 +81,33 @@ export default api;
 
 // Helper to get error message from API response
 export const getApiErrorMessage = (error: any): string => {
+  // Network error (no response)
+  if (error.code === "NETWORK_ERROR" || error.message === "Network Error" || !error.response) {
+    return `Network error: Unable to reach server at ${API_BASE_URL}. Please check your internet connection and ensure the server is running.`;
+  }
+
+  // Server responded with error
   if (error.response?.data?.message) {
     return error.response.data.message;
   }
+
+  // HTTP status code errors
+  if (error.response?.status === 401) {
+    return "Invalid email or password";
+  }
+  if (error.response?.status === 403) {
+    return "Account suspended or pending approval";
+  }
+  if (error.response?.status === 404) {
+    return `API endpoint not found. Check if the server is running at ${API_BASE_URL}`;
+  }
+  if (error.response?.status >= 500) {
+    return "Server error. Please try again later.";
+  }
+
   if (error.message) {
     return error.message;
   }
+
   return "An unexpected error occurred";
 };

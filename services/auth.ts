@@ -8,12 +8,19 @@ export interface Driver {
   phone: string;
   vehicle_model?: string;
   vehicle_color?: string;
+  vehicle_type?: string;
   vehicle_plate?: string;
   rating?: number;
   status?: string;
   is_online?: boolean;
   earnings_total?: number;
   commission_debt?: number;
+  documents?: {
+    id_card_front?: string;
+    id_card_back?: string;
+    license?: string;
+    registration?: string;
+  };
 }
 
 export interface AuthResponse {
@@ -29,7 +36,19 @@ export interface LoginData {
 // Login driver
 export const login = async (data: LoginData): Promise<AuthResponse> => {
   try {
+    console.log("🔐 Driver Login Attempt:", {
+      email: data.email,
+      endpoint: "/driver-app/auth/login",
+      baseURL: api.defaults.baseURL,
+    });
+
     const response = await api.post<AuthResponse>("/driver-app/auth/login", data);
+
+    console.log("✅ Driver Login Success:", {
+      status: response.status,
+      hasToken: !!response.data.token,
+      driverId: response.data.driver?._id,
+    });
 
     // Store token and driver data
     await AsyncStorage.setItem("driverAuthToken", response.data.token);
@@ -37,6 +56,13 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 
     return response.data;
   } catch (error: any) {
+    console.error("❌ Driver Login Error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+    });
     throw new Error(getApiErrorMessage(error));
   }
 };

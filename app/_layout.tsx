@@ -10,8 +10,6 @@ import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useColorScheme } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
 import {
   useFonts,
   Poppins_400Regular,
@@ -28,10 +26,14 @@ import { initSocket, disconnectSocket } from "../services/socket";
 
 SplashScreen.preventAutoHideAsync();
 
+// Open on index (auth gate) so we never show home until signed in
+export const unstable_settings = {
+  initialRouteName: "index",
+};
+
 export default function RootLayout() {
-  const router = useRouter();
   const colorScheme = useColorScheme();
-  const { checkAuth, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   const [loaded, error] = useFonts({
     Poppins_400Regular,
@@ -40,34 +42,9 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
-  // Check auth status and onboarding on app start
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Check if driver has seen onboarding
-        const hasSeenOnboarding = await AsyncStorage.getItem("hasSeenOnboarding");
-
-        // Check if driver is authenticated
-        const isLoggedIn = await checkAuth();
-
-        if (isLoggedIn) {
-          // Driver is logged in, initialize socket and go to main app
-          await initSocket();
-          router.replace("/(root)");
-        } else if (hasSeenOnboarding === "true") {
-          // Driver has seen onboarding but not logged in, go to login
-          router.replace("/auth/login");
-        }
-        // else: Driver hasn't seen onboarding, stay on welcome screen
-      } catch (e) {
-        console.error("Failed to initialize app", e);
-      }
-    };
-
     if (loaded || error) {
-      initializeApp().finally(() => {
-        SplashScreen.hideAsync();
-      });
+      SplashScreen.hideAsync();
     }
   }, [loaded, error]);
 
@@ -99,6 +76,7 @@ export default function RootLayout() {
             },
           }}
         >
+          <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="(root)" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />

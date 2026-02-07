@@ -293,7 +293,7 @@ export default function ActiveRide() {
                     if (historyRes?.rides?.length) {
                       setRideHistory(historyRes.rides.map(mapTripToRideHistory));
                     }
-                  } catch (_) {}
+                  } catch (_) { }
                   router.replace("/(root)");
                 } catch (error: any) {
                   useAlertStore.getState().showAlert({
@@ -339,7 +339,7 @@ export default function ActiveRide() {
                 if (historyRes?.rides?.length) {
                   setRideHistory(historyRes.rides.map(mapTripToRideHistory));
                 }
-              } catch (_) {}
+              } catch (_) { }
               router.replace("/(root)");
             } catch (error: any) {
               useAlertStore.getState().showAlert({
