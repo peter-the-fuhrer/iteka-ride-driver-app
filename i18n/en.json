@@ -168,6 +168,21 @@
   "status_accepted": "En Route to Pickup",
   "status_arrived": "Arrived at Pickup",
   "status_started": "Trip in Progress",
+  "status_driver_arrived": "Arrived at Pickup",
+  "status_driver_assigned": "Driver Assigned",
+  "status_ongoing": "Trip in Progress",
+  "status_completed": "Completed",
+  "status_cancelled": "Cancelled",
+  "status_en_route": "En Route",
+  "status_request": "Requested",
+  "status_scheduled": "Scheduled",
+
+  "driver_assigned": "Driver Assigned",
+  "driver_arrived": "Arrived at Pickup",
+  "ongoing": "In Progress",
+  "en_route": "En Route",
+  "request": "Requested",
+  "scheduled": "Scheduled",
 
   "pickup": "Pickup",
   "dropoff": "Dropoff",
@@ -204,5 +219,11 @@
   "faq_2": "What if a rider cancels the trip?",
   "faq_3": "How to change my vehicle details?",
   "faq_4": "Issues with the app map or GPS?",
-  "exp": "Exp"
+  "exp": "Exp",
+  "forgot_password": "Forgot password?",
+  "onboarding_illustration": "Illustration {{count}}",
+  "email_already_exists": "An account with this email already exists.",
+  "account_suspended": "Account suspended or pending approval.",
+  "unauthorized": "Invalid email or password.",
+  "network_error": "Unable to connect. Please check your internet connection."
 }

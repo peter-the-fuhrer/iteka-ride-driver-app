@@ -52,7 +52,7 @@ export default function Login() {
     } else {
       useAlertStore.getState().showAlert({
         title: t("alert_login_failed_title") || "Login Failed",
-        message: error || t("invalid_credentials") || "Invalid email or password",
+        message: error ? t(error, { defaultValue: error }) : t("invalid_credentials"),
         type: "error",
       });
     }

@@ -127,7 +127,7 @@ export default function Welcome() {
           <View style={styles.assetWrapper}>
             <View style={styles.assetPlaceholder}>
               <Text style={styles.assetText}>
-                Driver Illustration {activeIndex + 1}
+                {t("onboarding_illustration", { count: activeIndex + 1 })}
               </Text>
             </View>
           </View>

@@ -52,7 +52,7 @@ export default function History() {
             },
           ]}
         >
-          {t(item.status)}
+          {t(item.status, { defaultValue: item.status })}
         </Text>
       </View>
 

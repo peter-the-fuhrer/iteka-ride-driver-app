@@ -168,6 +168,21 @@
   "status_accepted": "En route vers le point de prise en charge",
   "status_arrived": "Arrivé au point de prise en charge",
   "status_started": "Course en cours",
+  "status_driver_arrived": "Arrivé au point de prise en charge",
+  "status_driver_assigned": "Chauffeur assigné",
+  "status_ongoing": "Course en cours",
+  "status_completed": "Terminée",
+  "status_cancelled": "Annulée",
+  "status_en_route": "En route",
+  "status_request": "Demandée",
+  "status_scheduled": "Planifiée",
+
+  "driver_assigned": "Chauffeur assigné",
+  "driver_arrived": "Arrivé au point de prise en charge",
+  "ongoing": "En cours",
+  "en_route": "En route",
+  "request": "Demandée",
+  "scheduled": "Planifiée",
 
   "pickup": "Prise en charge",
   "dropoff": "Destination",
@@ -204,5 +219,11 @@
   "faq_2": "Et si un passager annule la course ?",
   "faq_3": "Comment modifier les détails de mon véhicule ?",
   "faq_4": "Problèmes avec la carte ou le GPS ?",
-  "exp": "Exp"
+  "exp": "Exp",
+  "forgot_password": "Mot de passe oublié ?",
+  "onboarding_illustration": "Illustration {{count}}",
+  "email_already_exists": "Un compte avec cet email existe déjà.",
+  "account_suspended": "Compte suspendu ou en attente d'approbation.",
+  "unauthorized": "Email ou mot de passe invalide.",
+  "network_error": "Connexion impossible. Vérifiez votre connexion internet."
 }

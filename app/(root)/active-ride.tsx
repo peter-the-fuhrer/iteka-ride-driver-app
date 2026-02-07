@@ -430,7 +430,7 @@ export default function ActiveRide() {
           ]}
         >
           <Text style={[styles.statusText, { color: getStatusBadgeColor() }]}>
-            {t(`status_${activeRide.status}`)}
+            {t(`status_${activeRide.status}`, { defaultValue: activeRide.status })}
           </Text>
         </View>
       </View>
