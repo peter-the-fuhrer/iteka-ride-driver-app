@@ -59,6 +59,7 @@ export default function ActiveRide() {
   const [driverLocation, setDriverLocation] = useState({
     latitude: -3.385,
     longitude: 29.362,
+    heading: 0,
   });
 
   const [routeInfo, setRouteInfo] = useState({
@@ -143,42 +144,101 @@ export default function ActiveRide() {
       setDriverLocation({
         latitude: activeRide.pickupLocation.coordinates.latitude - 0.005,
         longitude: activeRide.pickupLocation.coordinates.longitude - 0.005,
+        heading: 0,
       });
     } else if (activeRide && activeRide.status === "started") {
-      setDriverLocation(activeRide.pickupLocation.coordinates);
+      setDriverLocation({
+        ...activeRide.pickupLocation.coordinates,
+        heading: 0,
+      });
     }
   }, [activeRide?.id]);
 
   // Real GPS: send driver location to backend so rider sees driver on map
-  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(
+    null,
+  );
   useEffect(() => {
     if (!activeRide || !driver?._id) return;
 
+    let cancelled = false;
+
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
+      // Check permission first
+      const { granted } = await Location.getForegroundPermissionsAsync();
+      if (!granted) {
+        // Request if not granted
+        const { granted: requestGranted } =
+          await Location.requestForegroundPermissionsAsync();
+        if (!requestGranted) return;
+      }
 
-      const update = async () => {
+      // Request full accuracy on iOS (Precise Location)
+      if (Platform.OS === "ios") {
         try {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          const { latitude, longitude } = loc.coords;
-          setDriverLocation({ latitude, longitude });
-          updateLocation(driver._id, latitude, longitude);
+          await Location.enableNetworkProviderAsync();
         } catch (e) {
-          console.warn("Active ride location update failed:", e);
+          console.log("Network provider already enabled or not needed");
         }
-      };
+      }
 
-      await update();
-      locationIntervalRef.current = setInterval(update, 5000);
+      // Initial position
+      try {
+        let { coords } = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Highest,
+        });
+
+        // Debug: Print coordinates
+        console.log(
+          "🚗 Active Ride Initial Coords:",
+          JSON.stringify(coords, null, 2),
+        );
+        console.log("🚗 Latitude:", coords.latitude);
+        console.log("🚗 Longitude:", coords.longitude);
+        console.log("🚗 Accuracy:", coords.accuracy);
+        console.log("🚗 Heading:", coords.heading);
+
+        if (!cancelled) {
+          const { latitude, longitude, heading } = coords;
+          setDriverLocation({ latitude, longitude, heading: heading ?? 0 });
+          updateLocation(driver._id, latitude, longitude);
+        }
+      } catch (e) {
+        console.warn("Initial active ride location failed:", e);
+      }
+
+      // Watch position
+      const sub = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Highest,
+          timeInterval: 2000,
+          distanceInterval: 2,
+        },
+        (loc) => {
+          if (cancelled) return;
+          const { latitude, longitude, heading, accuracy } = loc.coords;
+
+          // Debug: Print location updates
+          console.log("🚗 Active Ride Update:", {
+            latitude,
+            longitude,
+            heading,
+            accuracy,
+            timestamp: new Date().toISOString(),
+          });
+
+          setDriverLocation({ latitude, longitude, heading: heading ?? 0 });
+          updateLocation(driver._id, latitude, longitude);
+        },
+      );
+      locationSubscriptionRef.current = sub;
     })();
 
     return () => {
-      if (locationIntervalRef.current) {
-        clearInterval(locationIntervalRef.current);
-        locationIntervalRef.current = null;
+      cancelled = true;
+      if (locationSubscriptionRef.current) {
+        locationSubscriptionRef.current.remove();
+        locationSubscriptionRef.current = null;
       }
     };
   }, [activeRide?.id, driver?._id]);
@@ -220,7 +280,7 @@ export default function ActiveRide() {
           latitudeDelta: 0.005,
           longitudeDelta: 0.005,
         },
-        500
+        500,
       );
     }
   }, [driverLocation]);
@@ -291,9 +351,11 @@ export default function ActiveRide() {
                       });
                     }
                     if (historyRes?.rides?.length) {
-                      setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+                      setRideHistory(
+                        historyRes.rides.map(mapTripToRideHistory),
+                      );
                     }
-                  } catch (_) { }
+                  } catch (_) {}
                   router.replace("/(root)");
                 } catch (error: any) {
                   useAlertStore.getState().showAlert({
@@ -339,7 +401,7 @@ export default function ActiveRide() {
                 if (historyRes?.rides?.length) {
                   setRideHistory(historyRes.rides.map(mapTripToRideHistory));
                 }
-              } catch (_) { }
+              } catch (_) {}
               router.replace("/(root)");
             } catch (error: any) {
               useAlertStore.getState().showAlert({
@@ -430,7 +492,9 @@ export default function ActiveRide() {
           ]}
         >
           <Text style={[styles.statusText, { color: getStatusBadgeColor() }]}>
-            {t(`status_${activeRide.status}`, { defaultValue: activeRide.status })}
+            {t(`status_${activeRide.status}`, {
+              defaultValue: activeRide.status,
+            })}
           </Text>
         </View>
       </View>
@@ -483,7 +547,10 @@ export default function ActiveRide() {
               <XCircle size={24} color={Colors.error} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.mainActionButton, isActionLoading && styles.mainActionButtonDisabled]}
+              style={[
+                styles.mainActionButton,
+                isActionLoading && styles.mainActionButtonDisabled,
+              ]}
               onPress={handleAction}
               disabled={isActionLoading}
             >

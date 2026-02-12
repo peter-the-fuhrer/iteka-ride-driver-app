@@ -9,15 +9,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // LOCAL API – pick one for your run target:
 // • Android Emulator: 10.0.2.2 = host machine from emulator
 // • iOS Simulator: localhost (same machine)
-// • Physical device: your machine's LAN IP (e.g. 192.168.1.x) – ipconfig getifaddr en0
-const API_URL_LOCAL = "http://10.0.2.2:5000/api"; // Android emulator (default for local)
-// const API_URL_LOCAL = "http://localhost:5000/api"; // iOS simulator
-// const API_URL_LOCAL = "http://192.168.1.100:5000/api"; // Physical device – set your IP
+// • Physical device: your machine's LAN IP (e.g. 192.168.1.113)
+// const API_URL_LOCAL = "http://10.0.2.2:5000/api"; // Android emulator
+const API_URL_LOCAL = "http://192.168.1.117:5000/api"; // Physical device / LAN
+// const API_URL_LOCAL = "http://localhost:5000/api";
 
 // Socket URL – same host as API, no /api path (must match API_URL_LOCAL host)
-const SOCKET_URL_LOCAL = "http://10.0.2.2:5000"; // Android emulator
-// const SOCKET_URL_LOCAL = "http://localhost:5000"; // iOS simulator
-// const SOCKET_URL_LOCAL = "http://192.168.1.100:5000"; // Physical device
+// const SOCKET_URL_LOCAL = "http://10.0.2.2:5000"; // Android emulator
+const SOCKET_URL_LOCAL = "http://192.168.1.117:5000"; // Set to machine IP for discovery
+// const SOCKET_URL_LOCAL = "http://localhost:5000";
 
 // PRODUCTION API - Render deployed backend
 const API_URL_PROD = "https://iteka-ride-backend.onrender.com/api";
@@ -61,7 +61,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor - handle errors globally
@@ -74,7 +74,7 @@ api.interceptors.response.use(
       await AsyncStorage.removeItem("driverData");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
@@ -82,7 +82,11 @@ export default api;
 // Helper to get error message from API response
 export const getApiErrorMessage = (error: any): string => {
   // Network error (no response)
-  if (error.code === "NETWORK_ERROR" || error.message === "Network Error" || !error.response) {
+  if (
+    error.code === "NETWORK_ERROR" ||
+    error.message === "Network Error" ||
+    !error.response
+  ) {
     return `Network error: Unable to reach server at ${API_BASE_URL}. Please check your internet connection and ensure the server is running.`;
   }
 

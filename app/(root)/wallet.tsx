@@ -21,7 +21,11 @@ import {
 import { Colors } from "../../constants/Colors";
 import { useRouter } from "expo-router";
 import { useDriverStore } from "../../store/driverStore";
-import { getEarnings, getRideHistory, mapTripToRideHistory } from "../../services/driver";
+import {
+  getEarnings,
+  getRideHistory,
+  mapTripToRideHistory,
+} from "../../services/driver";
 
 const { width } = Dimensions.get("window");
 
@@ -59,7 +63,9 @@ export default function Wallet() {
       } catch (_) {}
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Filter only completed rides for wallet transactions
@@ -69,7 +75,16 @@ export default function Wallet() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -89,43 +104,45 @@ export default function Wallet() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>{t("available_balance")}</Text>
-          <Text style={styles.balanceAmount}>
-            {stats.netBalance.toLocaleString()} FBU
+        {/* Commission/Debt Card */}
+        <View
+          style={[
+            styles.balanceCard,
+            stats.totalDebt > 0 ? styles.debtCard : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.balanceLabel,
+              stats.totalDebt > 0 && { color: Colors.gray[600] },
+            ]}
+          >
+            {t("commission_owed")}
+          </Text>
+          <Text
+            style={[
+              styles.balanceAmount,
+              stats.totalDebt > 0 && { color: Colors.error },
+            ]}
+          >
+            {stats.totalDebt.toLocaleString()} FBU
           </Text>
 
-          {/* Debt Info */}
-          {stats.totalDebt > 0 && (
-            <View style={styles.debtRow}>
-              <Text style={styles.debtLabel}>{t("debt_owed")}: </Text>
-              <Text style={styles.debtAmount}>
-                {stats.totalDebt.toLocaleString()} FBU
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>{t("total_earnings")}</Text>
+              <Text style={styles.statValue}>
+                {(stats.totalEarnings + stats.totalDebt).toLocaleString()} FBU
               </Text>
             </View>
-          )}
-
-          <TouchableOpacity style={styles.cashoutButton}>
-            <Text style={styles.cashoutText}>{t("cash_out")}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Payment Methods */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("payment_methods")}</Text>
-          <TouchableOpacity style={styles.paymentMethod}>
-            <View style={styles.methodLeft}>
-              <View style={styles.methodIcon}>
-                <CreditCard size={20} color={Colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.methodName}>Lumicash</Text>
-                <Text style={styles.methodDetail}>**** 4567</Text>
-              </View>
+            <View style={styles.verticalLine} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>{t("net_profit")}</Text>
+              <Text style={styles.statValue}>
+                {stats.totalEarnings.toLocaleString()} FBU
+              </Text>
             </View>
-            <Text style={styles.editText}>{t("edit")}</Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Transaction History */}
@@ -133,8 +150,8 @@ export default function Wallet() {
           <Text style={styles.sectionTitle}>{t("recent_transactions")}</Text>
           {completedRides.length > 0 ? (
             completedRides.slice(0, 10).map((ride) => (
-              <View key={`${ride.id}-group`}>
-                {/* Earnings Transaction */}
+              <View key={`${ride.id}-group`} style={styles.historyGroup}>
+                {/* Trip Income */}
                 <View style={styles.transactionItem}>
                   <View style={styles.txLeft}>
                     <View
@@ -143,36 +160,37 @@ export default function Wallet() {
                       <TrendingUp size={18} color={Colors.success} />
                     </View>
                     <View>
-                      <Text style={styles.txType}>{t("trip_earning")}</Text>
+                      <Text style={styles.txType}>{t("cash_collected")}</Text>
                       <Text style={styles.txDate}>
-                        {new Date(ride.date).toLocaleDateString()}
+                        {new Date(ride.date).toLocaleDateString()} •{" "}
+                        {ride.distance.toFixed(1)} km
                       </Text>
                     </View>
                   </View>
                   <Text style={[styles.txAmount, { color: Colors.success }]}>
-                    +{ride.fare.toLocaleString()}
+                    +{ride.fare.toLocaleString()} FBU
                   </Text>
                 </View>
 
-                {/* Commission Deduction */}
-                <View style={styles.transactionItem}>
-                  <View style={styles.txLeft}>
-                    <View
-                      style={[styles.txIcon, { backgroundColor: "#f3f4f6" }]}
-                    >
-                      <TrendingDown size={18} color={Colors.gray[600]} />
+                {/* Commission Deduction (if any) */}
+                {ride.commission > 0 && (
+                  <View style={styles.transactionItem}>
+                    <View style={styles.txLeft}>
+                      <View
+                        style={[styles.txIcon, { backgroundColor: "#fee2e2" }]}
+                      >
+                        <TrendingDown size={18} color={Colors.error} />
+                      </View>
+                      <View>
+                        <Text style={styles.txType}>{t("commission")}</Text>
+                        <Text style={styles.txDate}>{t("platform_fee")}</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text style={styles.txType}>{t("commission")}</Text>
-                      <Text style={styles.txDate}>
-                        {new Date(ride.date).toLocaleDateString()}
-                      </Text>
-                    </View>
+                    <Text style={[styles.txAmount, { color: Colors.error }]}>
+                      -{ride.commission.toLocaleString()} FBU
+                    </Text>
                   </View>
-                  <Text style={[styles.txAmount, { color: Colors.black }]}>
-                    -{ride.commission.toLocaleString()}
-                  </Text>
-                </View>
+                )}
               </View>
             ))
           ) : (
@@ -260,52 +278,46 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_600SemiBold",
     fontSize: 16,
   },
-  section: {
-    marginBottom: 24,
+  debtCard: {
+    backgroundColor: "#fff1f2", // Light red background for debt
+    borderWidth: 1,
+    borderColor: "#fecaca",
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: "Poppins_600SemiBold",
-    color: Colors.black,
-    marginBottom: 16,
-  },
-  paymentMethod: {
+  statsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: Colors.gray[50],
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.gray[100],
+    width: "100%",
+    marginBottom: 20,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    padding: 12,
+    borderRadius: 12,
   },
-  methodLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  methodIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#fffbeb",
-    justifyContent: "center",
+  statItem: {
+    flex: 1,
     alignItems: "center",
   },
-  methodName: {
-    fontSize: 15,
-    fontFamily: "Poppins_600SemiBold",
-    color: Colors.black,
+  verticalLine: {
+    width: 1,
+    height: 24,
+    backgroundColor: Colors.gray[300],
   },
-  methodDetail: {
+  statLabel: {
     fontSize: 12,
     fontFamily: "Poppins_400Regular",
     color: Colors.gray[500],
+    marginBottom: 4,
   },
-  editText: {
-    color: Colors.primary,
-    fontFamily: "Poppins_500Medium",
+  statValue: {
     fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    color: Colors.black,
+  },
+  historyGroup: {
+    marginBottom: 10,
+    backgroundColor: Colors.gray[50], // Group transactions visually
+    borderRadius: 16,
+    padding: 12,
   },
   transactionItem: {
     flexDirection: "row",
@@ -338,6 +350,15 @@ const styles = StyleSheet.create({
   txAmount: {
     fontSize: 15,
     fontFamily: "Poppins_600SemiBold",
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: "Poppins_600SemiBold",
+    color: Colors.black,
+    marginBottom: 16,
   },
   emptyState: {
     padding: 40,

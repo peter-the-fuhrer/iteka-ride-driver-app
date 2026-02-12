@@ -1,4 +1,10 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  useCallback,
+} from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { WebView } from "react-native-webview";
 import { MAPBOX_ACCESS_TOKEN } from "../../constants/Mapbox";
@@ -25,9 +31,14 @@ export interface MapboxMapRef {
   fitToCoordinates: (
     coordinates: { latitude: number; longitude: number }[],
     options?: {
-      edgePadding?: { top: number; right: number; bottom: number; left: number };
+      edgePadding?: {
+        top: number;
+        right: number;
+        bottom: number;
+        left: number;
+      };
       animated?: boolean;
-    }
+    },
   ) => void;
   setMapStyle: (styleKey: MapStyleType) => void;
 }
@@ -46,7 +57,11 @@ interface MapboxMapProps {
   drivers?: DriverMarker[];
   routeCoordinates?: { latitude: number; longitude: number }[];
   displayRoute?: { latitude: number; longitude: number }[];
-  userLocation?: { latitude: number; longitude: number } | null;
+  userLocation?: {
+    latitude: number;
+    longitude: number;
+    heading?: number;
+  } | null;
   onRegionChangeComplete?: (region: Region) => void;
   style?: object;
 }
@@ -55,7 +70,12 @@ function latitudeDeltaToZoom(latitudeDelta: number): number {
   return Math.round(Math.log2(360 / latitudeDelta));
 }
 
-function getMapHTML(token: string, initialRegion: Region, mapStyleKey: MapStyleType = "streets", driverCarSvg: string = ""): string {
+function getMapHTML(
+  token: string,
+  initialRegion: Region,
+  mapStyleKey: MapStyleType = "streets",
+  driverCarSvg: string = "",
+): string {
   const center = [initialRegion.longitude, initialRegion.latitude];
   const zoom = latitudeDeltaToZoom(initialRegion.longitudeDelta);
   const styleUrl = MAP_STYLE_URLS[mapStyleKey] || MAP_STYLE_URLS.streets;
@@ -189,6 +209,16 @@ function getMapHTML(token: string, initialRegion: Region, mapStyleKey: MapStyleT
           if (data.userLocation) {
             if (userMarker) userMarker.remove();
             const userEl = document.createElement("div");
+            userEl.style.width = "48px";
+            userEl.style.height = "48px";
+            userEl.style.display = "flex";
+            userEl.style.alignItems = "center";
+            userEl.style.justifyContent = "center";
+            
+            if (data.userLocation.heading !== undefined) {
+              userEl.style.transform = "rotate(" + data.userLocation.heading + "deg)";
+            }
+
             if (window.__driverCarSvg) {
               var scaled = window.__driverCarSvg.replace(/<svg/, '<svg style="width:48px;height:48px;display:block"');
               userEl.innerHTML = '<div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;overflow:hidden">' + scaled + '</div>';
@@ -335,7 +365,7 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
     onRegionChangeComplete,
     style,
   },
-  ref
+  ref,
 ) {
   const webViewRef = useRef<WebView>(null);
 
@@ -361,28 +391,33 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
     () => ({
       animateToRegion: (region: Region, duration?: number) => {
         webViewRef.current?.injectJavaScript(
-          `window.animateToRegion && window.animateToRegion(${JSON.stringify(region)}, ${duration ?? 1000}); true;`
+          `window.animateToRegion && window.animateToRegion(${JSON.stringify(region)}, ${duration ?? 1000}); true;`,
         );
       },
       fitToCoordinates: (
         coordinates: { latitude: number; longitude: number }[],
         options?: {
-          edgePadding?: { top: number; right: number; bottom: number; left: number };
+          edgePadding?: {
+            top: number;
+            right: number;
+            bottom: number;
+            left: number;
+          };
           animated?: boolean;
-        }
+        },
       ) => {
         webViewRef.current?.injectJavaScript(
-          `window.fitToCoordinates && window.fitToCoordinates(${JSON.stringify(coordinates)}, ${JSON.stringify(options || {})}); true;`
+          `window.fitToCoordinates && window.fitToCoordinates(${JSON.stringify(coordinates)}, ${JSON.stringify(options || {})}); true;`,
         );
       },
       setMapStyle: (styleKey: MapStyleType) => {
         const url = MAP_STYLE_URLS[styleKey] || MAP_STYLE_URLS.streets;
         webViewRef.current?.injectJavaScript(
-          `window.setMapStyle && window.setMapStyle(${JSON.stringify(url)}); true;`
+          `window.setMapStyle && window.setMapStyle(${JSON.stringify(url)}); true;`,
         );
       },
     }),
-    []
+    [],
   );
 
   const handleMessage = useCallback(
@@ -392,7 +427,11 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
         if (__DEV__) {
           console.log("🗺️ WebView message:", msg.type);
         }
-        if (msg.type === "regionChangeComplete" && msg.region && onRegionChangeComplete) {
+        if (
+          msg.type === "regionChangeComplete" &&
+          msg.region &&
+          onRegionChangeComplete
+        ) {
           onRegionChangeComplete(msg.region);
         } else if (msg.type === "mapLoaded") {
           if (__DEV__) console.log("🗺️ Map loaded successfully in WebView!");
@@ -403,31 +442,48 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
         if (__DEV__) console.warn("🗺️ Failed to parse WebView message:", e);
       }
     },
-    [onRegionChangeComplete]
+    [onRegionChangeComplete],
   );
 
   // Debug log
   useEffect(() => {
     if (__DEV__) {
-      console.log("🗺️ MapboxMap rendering with token:", MAPBOX_ACCESS_TOKEN ? "Present" : "Missing");
+      console.log(
+        "🗺️ MapboxMap rendering with token:",
+        MAPBOX_ACCESS_TOKEN ? "Present" : "Missing",
+      );
       console.log("🗺️ Token length:", MAPBOX_ACCESS_TOKEN?.length || 0);
       console.log("🗺️ Initial region:", initialRegion);
       const html = getMapHTML(MAPBOX_ACCESS_TOKEN, initialRegion);
       console.log("🗺️ HTML length:", html.length);
       console.log("🗺️ HTML contains mapboxgl:", html.includes("mapboxgl"));
-      console.log("🗺️ HTML contains token:", html.includes(MAPBOX_ACCESS_TOKEN.substring(0, 20)));
+      console.log(
+        "🗺️ HTML contains token:",
+        html.includes(MAPBOX_ACCESS_TOKEN.substring(0, 20)),
+      );
     }
   }, []);
 
   if (!MAPBOX_ACCESS_TOKEN) {
     return (
       <View style={[styles.map, style]}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-          <View style={{ backgroundColor: "#fef3c7", padding: 16, borderRadius: 8 }}>
-            <Text style={{ fontWeight: "600", marginBottom: 4 }}>Mapbox token required</Text>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{ backgroundColor: "#fef3c7", padding: 16, borderRadius: 8 }}
+          >
+            <Text style={{ fontWeight: "600", marginBottom: 4 }}>
+              Mapbox token required
+            </Text>
             <Text style={{ fontSize: 14, color: "#92400e" }}>
-              Add EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env file. Get a free token at
-              https://account.mapbox.com/access-tokens/
+              Add EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env file. Get a free
+              token at https://account.mapbox.com/access-tokens/
             </Text>
             <Text style={{ fontSize: 12, color: "#92400e", marginTop: 8 }}>
               Current value: {MAPBOX_ACCESS_TOKEN || "undefined"}
@@ -442,7 +498,12 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
     <WebView
       ref={webViewRef}
       source={{
-        html: getMapHTML(MAPBOX_ACCESS_TOKEN, initialRegion, mapStyle, DRIVER_CAR_SVG),
+        html: getMapHTML(
+          MAPBOX_ACCESS_TOKEN,
+          initialRegion,
+          mapStyle,
+          DRIVER_CAR_SVG,
+        ),
         baseUrl: "https://api.mapbox.com",
       }}
       style={[styles.map, style]}
@@ -454,10 +515,17 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
         if (__DEV__) console.log("🗺️ WebView load ended");
       }}
       onError={(e) => {
-        console.error("🗺️ WebView error:", JSON.stringify(e.nativeEvent, null, 2));
+        console.error(
+          "🗺️ WebView error:",
+          JSON.stringify(e.nativeEvent, null, 2),
+        );
       }}
       onHttpError={(e) => {
-        console.error("🗺️ WebView HTTP error:", e.nativeEvent.statusCode, e.nativeEvent.description);
+        console.error(
+          "🗺️ WebView HTTP error:",
+          e.nativeEvent.statusCode,
+          e.nativeEvent.description,
+        );
       }}
       scrollEnabled={false}
       bounces={false}
@@ -469,7 +537,14 @@ const MapboxMap = forwardRef<MapboxMapRef, MapboxMapProps>(function MapboxMap(
       mediaPlaybackRequiresUserAction={false}
       startInLoadingState={true}
       renderLoading={() => (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f0f0f0" }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "#f0f0f0",
+          }}
+        >
           <Text>Loading map...</Text>
         </View>
       )}

@@ -1,5 +1,9 @@
 import api, { getApiErrorMessage } from "./api";
-import type { RideRequest, ActiveRide, RideHistory } from "../store/driverStore";
+import type {
+  RideRequest,
+  ActiveRide,
+  RideHistory,
+} from "../store/driverStore";
 
 export interface StatusUpdateData {
   is_online: boolean;
@@ -18,7 +22,9 @@ export interface Trip {
   _id: string;
   client_id: TripClient | string;
   driver_id?: string;
-  ride_type_id?: string | { _id: string; name: string; is_ride: boolean; is_delivery: boolean };
+  ride_type_id?:
+    | string
+    | { _id: string; name: string; is_ride: boolean; is_delivery: boolean };
   trip_type?: "ride" | "delivery";
   pickup: {
     address: string;
@@ -32,7 +38,13 @@ export interface Trip {
   };
   distance: number;
   price: number;
-  status: "request" | "driver_assigned" | "driver_arrived" | "ongoing" | "completed" | "cancelled";
+  status:
+    | "request"
+    | "driver_assigned"
+    | "driver_arrived"
+    | "ongoing"
+    | "completed"
+    | "cancelled";
   date_time: string;
   payment_method?: string;
   createdAt: string;
@@ -59,9 +71,14 @@ export const acceptRide = async (tripId: string): Promise<Trip> => {
 };
 
 // Update ride state (driver_arrived, ongoing, completed)
-export const updateRideState = async (tripId: string, status: string): Promise<Trip> => {
+export const updateRideState = async (
+  tripId: string,
+  status: string,
+): Promise<Trip> => {
   try {
-    const response = await api.put<Trip>(`/driver-app/ride/${tripId}/state`, { status });
+    const response = await api.put<Trip>(`/driver-app/ride/${tripId}/state`, {
+      status,
+    });
     return response.data;
   } catch (error: any) {
     throw new Error(getApiErrorMessage(error));
@@ -83,9 +100,17 @@ export const getActiveRide = async (): Promise<Trip | null> => {
 };
 
 // Get driver's ride history
-export const getRideHistory = async (params?: { page?: number; limit?: number }): Promise<{ rides: Trip[]; total: number; page: number; limit: number }> => {
+export const getRideHistory = async (params?: {
+  page?: number;
+  limit?: number;
+}): Promise<{ rides: Trip[]; total: number; page: number; limit: number }> => {
   try {
-    const response = await api.get<{ rides: Trip[]; total: number; page: number; limit: number }>("/driver-app/rides", { params });
+    const response = await api.get<{
+      rides: Trip[];
+      total: number;
+      page: number;
+      limit: number;
+    }>("/driver-app/rides", { params });
     return response.data;
   } catch (error: any) {
     throw new Error(getApiErrorMessage(error));
@@ -101,6 +126,8 @@ export const getEarnings = async (): Promise<{
   totalEarnings: number;
   totalDebt: number;
   netBalance: number;
+  hoursOnline: number;
+  weeklyData: { day: string; amount: number }[];
 }> => {
   try {
     const response = await api.get("/driver-app/earnings");
@@ -110,12 +137,26 @@ export const getEarnings = async (): Promise<{
   }
 };
 
-// Map API Trip to store RideRequest/ActiveRide format
+// Get global settings (support info, etc.)
+export const getSettings = async (): Promise<{
+  support_email: string;
+  support_phone: string;
+}> => {
+  try {
+    const response = await api.get("/settings");
+    return response.data;
+  } catch (error: any) {
+    throw new Error(getApiErrorMessage(error));
+  }
+};
+
 export function mapTripToRideRequest(trip: Trip): RideRequest {
   const clientData = typeof trip.client_id === "object" ? trip.client_id : null;
   return {
     id: trip._id,
-    customerId: clientData?._id ?? (typeof trip.client_id === "string" ? trip.client_id : ""),
+    customerId:
+      clientData?._id ??
+      (typeof trip.client_id === "string" ? trip.client_id : ""),
     customerName: clientData?.name ?? "Customer",
     customerRating: clientData?.rating ?? 4.5,
     customerPhone: clientData?.phone ?? "",
@@ -125,7 +166,10 @@ export function mapTripToRideRequest(trip: Trip): RideRequest {
     },
     dropoffLocation: {
       address: trip.destination.address,
-      coordinates: { latitude: trip.destination.lat, longitude: trip.destination.lng },
+      coordinates: {
+        latitude: trip.destination.lat,
+        longitude: trip.destination.lng,
+      },
     },
     estimatedFare: trip.price,
     distance: (trip.distance || 0) / 1000,

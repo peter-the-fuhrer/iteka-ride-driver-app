@@ -4,6 +4,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -13,21 +15,103 @@ import {
   HelpCircle,
   MessageCircle,
   Phone,
+  Mail,
 } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { getSettings } from "../../services/driver";
+
+interface Settings {
+  support_email: string;
+  support_phone: string;
+}
 
 export default function Support() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const router = useRouter();
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const data = await getSettings();
+      setSettings(data);
+    } catch (error) {
+      console.log("Error fetching settings:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCall = () => {
+    if (settings?.support_phone) {
+      Linking.openURL(`tel:${settings.support_phone}`);
+    }
+  };
+
+  const handleEmail = () => {
+    if (settings?.support_email) {
+      Linking.openURL(`mailto:${settings.support_email}`);
+    }
+  };
+
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+
+  const toggleFaq = (id: number) => {
+    setExpandedFaq(expandedFaq === id ? null : id);
+  };
 
   const faqs = [
-    { id: 1, question: t("faq_1") },
-    { id: 2, question: t("faq_2") },
-    { id: 3, question: t("faq_3") },
-    { id: 4, question: t("faq_4") },
+    {
+      id: 1,
+      question: t("faq_payment_q") || "How do I pay my commission debt?",
+      answer:
+        t("faq_payment_a") ||
+        "You cannot pay directly in the app. Please visit our office or contact support to settle your commission debt via Lumicash or other approved methods.",
+    },
+    {
+      id: 2,
+      question: t("faq_suspended_q") || "Why is my account suspended?",
+      answer:
+        t("faq_suspended_a") ||
+        "Your account may be suspended if your commission debt exceeds the allowed limit or if your documents have expired. Contact support to resolve this.",
+    },
+    {
+      id: 3,
+      question: t("faq_earnings_q") || "How are earnings calculated?",
+      answer:
+        t("faq_earnings_a") ||
+        "You keep the cash you collect from clients. The platform commission is calculated per ride and added to your debt. Your Net Profit is (Cash Collected - Commission Debt).",
+    },
+    {
+      id: 4,
+      question: t("faq_docs_q") || "How do I update my documents?",
+      answer:
+        t("faq_docs_a") ||
+        "To update your license or vehicle documents, please contact our support team. You cannot edit verified documents directly in the app for security reasons.",
+    },
+    {
+      id: 5,
+      question: t("faq_client_q") || "What if a client refuses to pay?",
+      answer:
+        t("faq_client_a") ||
+        "Please remain calm and report the issue immediately to our support team using the 'Call Support' button. Do not engage in conflict.",
+    },
   ];
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerObj]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -47,18 +131,24 @@ export default function Support() {
         <View style={styles.contactSection}>
           <Text style={styles.sectionTitle}>{t("contact_us")}</Text>
           <View style={styles.contactRow}>
-            <TouchableOpacity style={styles.contactCard}>
+            <TouchableOpacity style={styles.contactCard} onPress={handleCall}>
               <View style={[styles.iconBox, { backgroundColor: "#eff6ff" }]}>
                 <Phone size={24} color={Colors.info} />
               </View>
               <Text style={styles.contactLabel}>{t("call_support")}</Text>
+              <Text style={styles.contactValue}>
+                {settings?.support_phone || "N/A"}
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.contactCard}>
+            <TouchableOpacity style={styles.contactCard} onPress={handleEmail}>
               <View style={[styles.iconBox, { backgroundColor: "#dcfce7" }]}>
-                <MessageCircle size={24} color={Colors.success} />
+                <Mail size={24} color={Colors.success} />
               </View>
-              <Text style={styles.contactLabel}>{t("chat_support")}</Text>
+              <Text style={styles.contactLabel}>{t("email_support")}</Text>
+              <Text style={styles.contactValue} numberOfLines={1}>
+                {settings?.support_email || "N/A"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -69,12 +159,32 @@ export default function Support() {
             {t("frequently_asked_questions")}
           </Text>
           {faqs.map((faq) => (
-            <TouchableOpacity key={faq.id} style={styles.faqItem}>
-              <View style={styles.faqLeft}>
-                <HelpCircle size={20} color={Colors.gray[400]} />
-                <Text style={styles.faqText}>{faq.question}</Text>
+            <TouchableOpacity
+              key={faq.id}
+              style={styles.faqItem}
+              onPress={() => toggleFaq(faq.id)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.faqHeader}>
+                <View style={styles.faqLeft}>
+                  <HelpCircle size={20} color={Colors.gray[400]} />
+                  <Text style={styles.faqText}>{faq.question}</Text>
+                </View>
+                <ChevronRight
+                  size={20}
+                  color={Colors.gray[400]}
+                  style={{
+                    transform: [
+                      { rotate: expandedFaq === faq.id ? "90deg" : "0deg" },
+                    ],
+                  }}
+                />
               </View>
-              <ChevronRight size={20} color={Colors.gray[400]} />
+              {expandedFaq === faq.id && (
+                <View style={styles.faqAnswer}>
+                  <Text style={styles.faqAnswerText}>{faq.answer}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -87,6 +197,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.white,
+  },
+  centerObj: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",
@@ -149,17 +263,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Poppins_500Medium",
     color: Colors.black,
+    marginBottom: 4,
+  },
+  contactValue: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    color: Colors.gray[500],
+    textAlign: "center",
   },
   faqSection: {
     marginBottom: 20,
   },
   faqItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[100],
+  },
+  faqHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   faqLeft: {
     flexDirection: "row",
@@ -169,8 +292,18 @@ const styles = StyleSheet.create({
   },
   faqText: {
     fontSize: 14,
-    fontFamily: "Poppins_400Regular",
+    fontFamily: "Poppins_500Medium",
     color: Colors.black,
     flex: 1,
+  },
+  faqAnswer: {
+    marginTop: 12,
+    paddingLeft: 32, // Align with text
+  },
+  faqAnswerText: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: Colors.gray[600],
+    lineHeight: 20,
   },
 });

@@ -9,7 +9,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import MapboxMap, { type MapboxMapRef, type MapStyleType } from "../../components/Map/MapboxMap";
+import MapboxMap, {
+  type MapboxMapRef,
+  type MapStyleType,
+} from "../../components/Map/MapboxMap";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { Power, Layers, LocateFixed } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
@@ -67,8 +70,12 @@ export default function Home() {
   const [mapStyle, setMapStyle] = useState<MapStyleType>("streets");
 
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(
+    null,
+  );
   const mapRef = useRef<MapboxMapRef>(null);
+  const [isLocationEnabled, setIsLocationEnabled] = useState(true);
+  const locationStatusIntervalRef = useRef<any>(null);
   const hasZoomedToLocation = useRef(false);
 
   // Snap points
@@ -123,7 +130,8 @@ export default function Home() {
         ]);
         if (cancelled) return;
         if (active) setActiveRide(mapTripToActiveRide(active));
-        if (historyRes?.rides?.length) setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+        if (historyRes?.rides?.length)
+          setRideHistory(historyRes.rides.map(mapTripToRideHistory));
         if (earnings) {
           updateStats({
             todayEarnings: earnings.todayEarnings ?? 0,
@@ -140,7 +148,9 @@ export default function Home() {
         // Ignore; user may be offline or API not ready
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [driver?._id]);
 
   // Listen for ride requests via Socket.IO
@@ -149,21 +159,30 @@ export default function Home() {
       console.log("New ride request received:", trip);
 
       // Convert backend Trip to RideRequest format
-      const clientData = typeof trip.client_id === 'object' ? trip.client_id : null;
+      const clientData =
+        typeof trip.client_id === "object" ? trip.client_id : null;
 
       const request: RideRequest = {
         id: trip._id,
-        customerId: clientData?._id || (typeof trip.client_id === 'string' ? trip.client_id : ''),
+        customerId:
+          clientData?._id ||
+          (typeof trip.client_id === "string" ? trip.client_id : ""),
         customerName: clientData?.name || "Customer",
         customerRating: clientData?.rating || 4.5,
         customerPhone: clientData?.phone || "",
         pickupLocation: {
           address: trip.pickup.address,
-          coordinates: { latitude: trip.pickup.lat, longitude: trip.pickup.lng },
+          coordinates: {
+            latitude: trip.pickup.lat,
+            longitude: trip.pickup.lng,
+          },
         },
         dropoffLocation: {
           address: trip.destination.address,
-          coordinates: { latitude: trip.destination.lat, longitude: trip.destination.lng },
+          coordinates: {
+            latitude: trip.destination.lat,
+            longitude: trip.destination.lng,
+          },
         },
         estimatedFare: trip.price,
         distance: trip.distance / 1000, // Convert to km
@@ -202,55 +221,167 @@ export default function Home() {
 
     (async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          useAlertStore.getState().showAlert({
-            title: t("error") || "Location Permission Required",
-            message: "Please enable location access in settings to go online.",
-            type: "error",
-          });
-          return;
+        // Check permission first
+        const { granted } = await Location.getForegroundPermissionsAsync();
+        if (!granted) {
+          // Request if not granted
+          const { granted: requestGranted } =
+            await Location.requestForegroundPermissionsAsync();
+          if (!requestGranted) {
+            setIsLocationEnabled(false);
+            useAlertStore.getState().showAlert({
+              title: t("error") || "Location Permission Required",
+              message:
+                "Please enable location access in settings to go online.",
+              type: "error",
+            });
+            return;
+          }
         }
 
+        // Request full accuracy on iOS (Precise Location)
+        if (Platform.OS === "ios") {
+          try {
+            await Location.enableNetworkProviderAsync();
+            console.log("✅ iOS Network Provider Enabled");
+          } catch (e) {
+            console.log("⚠️ Network provider error:", e);
+          }
+        }
+
+        // Check location permission details
+        const permissionDetails =
+          await Location.getForegroundPermissionsAsync();
+        console.log(
+          "🔐 Permission Details:",
+          JSON.stringify(permissionDetails, null, 2),
+        );
+
+        // Check if services are enabled
+        const enabled = await Location.hasServicesEnabledAsync();
+        setIsLocationEnabled(enabled);
+
         // One-time initial position for map zoom
-        const initial = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+        console.log("🔍 Requesting location with Accuracy.Highest...");
+        let { coords } = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Highest,
         });
+
+        // Expected coordinates: 3°25'44.7"S 29°21'36.5"E = -3.4291, 29.3601
+        const EXPECTED_LAT = -3.4291;
+        const EXPECTED_LNG = 29.3601;
+
+        // Debug: Print coordinates
+        console.log("\n========== LOCATION DEBUG ==========");
+        console.log("📍 Full Coords Object:", JSON.stringify(coords, null, 2));
+        console.log("\n📊 Coordinate Breakdown:");
+        console.log("  Latitude:", coords.latitude);
+        console.log("  Longitude:", coords.longitude);
+        console.log("  Accuracy (meters):", coords.accuracy);
+        console.log("  Altitude:", coords.altitude);
+        console.log("  Altitude Accuracy:", coords.altitudeAccuracy);
+        console.log("  Heading:", coords.heading);
+        console.log("  Speed:", coords.speed);
+        console.log("\n🎯 Expected Location:");
+        console.log("  Latitude:", EXPECTED_LAT, "(3°25'44.7\"S)");
+        console.log("  Longitude:", EXPECTED_LNG, "(29°21'36.5\"E)");
+        console.log("\n� Difference from Expected:");
+        console.log(
+          "  Lat Diff:",
+          (coords.latitude - EXPECTED_LAT).toFixed(6),
+          "degrees",
+        );
+        console.log(
+          "  Lng Diff:",
+          (coords.longitude - EXPECTED_LNG).toFixed(6),
+          "degrees",
+        );
+        const latDiffMeters = Math.abs(coords.latitude - EXPECTED_LAT) * 111000;
+        const lngDiffMeters =
+          Math.abs(coords.longitude - EXPECTED_LNG) *
+          111000 *
+          Math.cos((coords.latitude * Math.PI) / 180);
+        console.log("  Lat Diff (meters):", latDiffMeters.toFixed(2));
+        console.log("  Lng Diff (meters):", lngDiffMeters.toFixed(2));
+        console.log(
+          "  Total Distance Error:",
+          Math.sqrt(latDiffMeters ** 2 + lngDiffMeters ** 2).toFixed(2),
+          "meters",
+        );
+        console.log("\n⚠️ GPS Status:");
+        if (coords.accuracy > 50) {
+          console.log("  ❌ POOR ACCURACY - GPS signal is weak!");
+        } else if (coords.accuracy > 20) {
+          console.log("  ⚠️ FAIR ACCURACY - GPS could be better");
+        } else if (coords.accuracy > 10) {
+          console.log("  ✅ GOOD ACCURACY");
+        } else {
+          console.log("  ✅✅ EXCELLENT ACCURACY");
+        }
+        console.log("====================================\n");
+
         if (cancelled) return;
-        const { latitude: lat0, longitude: lng0 } = initial.coords;
-        setCurrentLocation({ latitude: lat0, longitude: lng0 });
+        const { latitude: lat0, longitude: lng0, heading: head0 } = coords;
+        setCurrentLocation({
+          latitude: lat0,
+          longitude: lng0,
+          heading: head0 ?? 0,
+        });
         socketUpdateLocation(driver._id, lat0, lng0);
         if (!hasZoomedToLocation.current && mapRef.current) {
           hasZoomedToLocation.current = true;
-          mapRef.current.animateToRegion({
-            latitude: lat0,
-            longitude: lng0,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }, 1000);
+          mapRef.current.animateToRegion(
+            {
+              latitude: lat0,
+              longitude: lng0,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            },
+            1000,
+          );
         }
 
-        // Subscribe to location updates (OS-driven: updates on move or at most every 10s)
+        // Subscribe to location updates
         const sub = await Location.watchPositionAsync(
           {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: 10000,   // at most every 10s when stationary
-            distanceInterval: 15,  // or when moved ~15m (reduces updates when parked)
+            accuracy: Location.Accuracy.Highest,
+            timeInterval: 2000, // updates every 2s for better precision
+            distanceInterval: 2, // or when moved 2m
           },
           (loc) => {
             if (cancelled) return;
-            const { latitude, longitude } = loc.coords;
-            setCurrentLocation({ latitude, longitude });
+            const { latitude, longitude, heading, accuracy } = loc.coords;
+
+            // Debug: Print location updates
+            console.log("🔄 Location Update:", {
+              latitude,
+              longitude,
+              heading,
+              accuracy,
+              timestamp: new Date().toISOString(),
+            });
+
+            setCurrentLocation({ latitude, longitude, heading: heading ?? 0 });
             socketUpdateLocation(driver._id, latitude, longitude);
-          }
+            setIsLocationEnabled(true); // If we get an update, it's enabled
+          },
         );
         locationSubscriptionRef.current = sub;
+
+        // Start polling for location service status
+        locationStatusIntervalRef.current = setInterval(async () => {
+          const isEnabled = await Location.hasServicesEnabledAsync();
+          if (cancelled) return;
+          setIsLocationEnabled(isEnabled);
+        }, 5000);
       } catch (error) {
         console.error("Error setting up location tracking:", error);
+        setIsLocationEnabled(false);
         if (!currentLocation) {
           setCurrentLocation({
             latitude: -3.3822,
             longitude: 29.3644,
+            heading: 0,
           });
         }
       }
@@ -262,6 +393,10 @@ export default function Home() {
         locationSubscriptionRef.current.remove();
         locationSubscriptionRef.current = null;
       }
+      if (locationStatusIntervalRef.current) {
+        clearInterval(locationStatusIntervalRef.current);
+        locationStatusIntervalRef.current = null;
+      }
     };
   }, [isOnline, driver?._id]);
 
@@ -269,12 +404,15 @@ export default function Home() {
   useEffect(() => {
     if (currentLocation && mapRef.current && !hasZoomedToLocation.current) {
       hasZoomedToLocation.current = true;
-      mapRef.current.animateToRegion({
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        latitudeDelta: 0.01, // Zoom level - smaller = more zoomed in
-        longitudeDelta: 0.01,
-      }, 1000);
+      mapRef.current.animateToRegion(
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01, // Zoom level - smaller = more zoomed in
+          longitudeDelta: 0.01,
+        },
+        1000,
+      );
     }
   }, [currentLocation]);
 
@@ -294,7 +432,6 @@ export default function Home() {
       });
     }
   };
-
   const handleGoOnline = async () => {
     // Request location permission and get current location before going online
     try {
@@ -302,7 +439,8 @@ export default function Home() {
       if (status !== "granted") {
         useAlertStore.getState().showAlert({
           title: t("error") || "Permission Required",
-          message: "Location permission is required to go online. Please enable location access in settings.",
+          message:
+            "Location permission is required to go online. Please enable location access in settings.",
           type: "error",
         });
         return;
@@ -312,17 +450,20 @@ export default function Home() {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      const { latitude, longitude } = loc.coords;
-      setCurrentLocation({ latitude, longitude });
-      
+      const { latitude, longitude, heading } = loc.coords;
+      setCurrentLocation({ latitude, longitude, heading: heading ?? 0 });
+
       // Zoom to location immediately when going online
       if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude,
-          longitude,
-          latitudeDelta: 0.01, // Zoom level - smaller = more zoomed in
-          longitudeDelta: 0.01,
-        }, 1000);
+        mapRef.current.animateToRegion(
+          {
+            latitude,
+            longitude,
+            latitudeDelta: 0.01, // Zoom level - smaller = more zoomed in
+            longitudeDelta: 0.01,
+          },
+          1000,
+        );
         hasZoomedToLocation.current = true;
       }
 
@@ -454,7 +595,11 @@ export default function Home() {
         }}
         userLocation={
           currentLocation
-            ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude }
+            ? {
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+                heading: currentLocation.heading,
+              }
             : null
         }
       />
@@ -490,6 +635,39 @@ export default function Home() {
         </View>
       )}
 
+      {/* Location Disabled Warning */}
+      {isOnline && !isLocationEnabled && (
+        <View style={styles.overlayWarning}>
+          <View style={styles.warningCard}>
+            <View style={styles.warningIconContainer}>
+              <LocateFixed size={32} color={Colors.white} />
+            </View>
+            <Text style={styles.warningTitle}>
+              {t("location_disabled") || "Location Disabled"}
+            </Text>
+            <Text style={styles.warningMessage}>
+              {t("location_disabled_msg") ||
+                "Your location is turned off. Customers won't be able to find you. Please turn it on to receive ride requests."}
+            </Text>
+            <TouchableOpacity
+              style={styles.warningButton}
+              onPress={async () => {
+                if (Platform.OS === "ios") {
+                  // iOS usually requires manually going to settings
+                } else {
+                  // For Android some intent could be used, but for simplicity:
+                  await Location.hasServicesEnabledAsync();
+                }
+              }}
+            >
+              <Text style={styles.warningButtonText}>
+                {t("enable_location") || "Enable Location"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Top Header Area: Earnings */}
       <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
@@ -517,7 +695,12 @@ export default function Home() {
         <TouchableOpacity
           style={styles.mapControlButton}
           onPress={() => {
-            const next: MapStyleType = mapStyle === "streets" ? "satellite" : mapStyle === "satellite" ? "hybrid" : "streets";
+            const next: MapStyleType =
+              mapStyle === "streets"
+                ? "satellite"
+                : mapStyle === "satellite"
+                  ? "hybrid"
+                  : "streets";
             setMapStyle(next);
             mapRef.current?.setMapStyle(next);
           }}
@@ -536,7 +719,7 @@ export default function Home() {
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 },
-                800
+                800,
               );
             }
           }}
@@ -698,6 +881,64 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: Colors.gray[100],
+  },
+  overlayWarning: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+    padding: 20,
+  },
+  warningCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 320,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  warningIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.error,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  warningTitle: {
+    fontSize: 20,
+    fontFamily: "Poppins_700Bold",
+    color: Colors.black,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  warningMessage: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: Colors.gray[600],
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  warningButton: {
+    backgroundColor: Colors.black,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  warningButtonText: {
+    color: Colors.white,
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 16,
   },
   pulseContainer: {
     ...StyleSheet.absoluteFillObject,

@@ -49,8 +49,16 @@ export default function Profile() {
 
         // Check document status
         const docs = response.data?.documents || {};
-        const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
-        const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
+        const hasAllDocs =
+          docs.id_card_front &&
+          docs.id_card_back &&
+          docs.license &&
+          docs.registration;
+        const hasSomeDocs =
+          docs.id_card_front ||
+          docs.id_card_back ||
+          docs.license ||
+          docs.registration;
 
         if (hasAllDocs) {
           setDocumentsStatus(t("verified") || "Verified");
@@ -63,8 +71,16 @@ export default function Profile() {
         // If endpoint doesn't exist or fails, use driver from auth store
         console.log("Could not fetch full profile, using auth store data");
         const docs = driver?.documents || {};
-        const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
-        const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
+        const hasAllDocs =
+          docs.id_card_front &&
+          docs.id_card_back &&
+          docs.license &&
+          docs.registration;
+        const hasSomeDocs =
+          docs.id_card_front ||
+          docs.id_card_back ||
+          docs.license ||
+          docs.registration;
 
         if (hasAllDocs) {
           setDocumentsStatus(t("verified") || "Verified");
@@ -99,7 +115,11 @@ export default function Profile() {
         <View style={styles.itemLabelValueWrap}>
           <Text style={styles.itemLabel}>{label}</Text>
           {value ? (
-            <Text style={styles.itemValue} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={styles.itemValue}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {value}
             </Text>
           ) : null}
@@ -112,9 +132,9 @@ export default function Profile() {
             onValueChange={onValueChange}
             trackColor={{ false: Colors.gray[200], true: Colors.primary }}
           />
-        ) : (
+        ) : onPress ? (
           <ChevronRight size={20} color={Colors.gray[400]} />
-        )}
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -133,8 +153,12 @@ export default function Profile() {
       return driver.vehicle_plate;
     }
     if (driverProfile?.vehicle_type || driver?.vehicle_type) {
-      return (driverProfile?.vehicle_type || driver?.vehicle_type)?.charAt(0).toUpperCase() +
-        (driverProfile?.vehicle_type || driver?.vehicle_type)?.slice(1);
+      return (
+        (driverProfile?.vehicle_type || driver?.vehicle_type)
+          ?.charAt(0)
+          .toUpperCase() +
+        (driverProfile?.vehicle_type || driver?.vehicle_type)?.slice(1)
+      );
     }
     return t("no_vehicle") || "No Vehicle";
   };
@@ -163,7 +187,8 @@ export default function Profile() {
             {driverProfile?.name || driver?.name || t("driver_name_default")}
           </Text>
           <Text style={styles.driverRating}>
-            ⭐ {(driverProfile?.rating || driver?.rating || 0).toFixed(1)} • {driver?.status === "active" ? t("verified") : t("pending")}
+            ⭐ {(driverProfile?.rating || driver?.rating || 0).toFixed(1)} •{" "}
+            {driver?.status === "active" ? t("verified") : t("pending")}
           </Text>
         </View>
 
@@ -178,24 +203,23 @@ export default function Profile() {
           <ProfileItem
             icon={Wallet}
             label={t("wallet")}
-            value={`${stats.netBalance.toLocaleString()} FBU`}
+            value={
+              stats.totalDebt > 0
+                ? `${t("debt") || "Debt"}: ${stats.totalDebt.toLocaleString()} FBU`
+                : `${stats.netBalance.toLocaleString()} FBU`
+            }
             onPress={() => router.push("/wallet")}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("vehicle_and_docs")}</Text>
+          <Text style={styles.sectionTitle}>
+            {t("vehicle_info") || "Vehicle"}
+          </Text>
           <ProfileItem
             icon={Car}
             label={t("my_vehicles")}
             value={getVehicleDisplay()}
-            onPress={() => router.push("/vehicles")}
-          />
-          <ProfileItem
-            icon={FileText}
-            label={t("documents")}
-            value={documentsStatus}
-            onPress={() => router.push("/documents")}
           />
         </View>
 

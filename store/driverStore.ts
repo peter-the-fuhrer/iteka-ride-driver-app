@@ -51,11 +51,16 @@ export interface DriverStats {
   totalDebt: number; // Total commission owed
   totalEarnings: number; // Gross earnings
   netBalance: number; // totalEarnings - totalDebt
+  weeklyData: { day: string; amount: number }[];
 }
 
 interface DriverState {
   isOnline: boolean;
-  currentLocation: { latitude: number; longitude: number } | null;
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+    heading?: number;
+  } | null;
   rideRequest: RideRequest | null;
   activeRide: ActiveRide | null;
   rideHistory: RideHistory[];
@@ -66,6 +71,7 @@ interface DriverState {
   setCurrentLocation: (location: {
     latitude: number;
     longitude: number;
+    heading: number;
   }) => void;
   setRideRequest: (request: RideRequest | null) => void;
   acceptRide: () => void;
@@ -90,6 +96,7 @@ const initialStats: DriverStats = {
   totalDebt: 0,
   totalEarnings: 0,
   netBalance: 0,
+  weeklyData: [],
 };
 
 export const useDriverStore = create<DriverState>((set, get) => ({

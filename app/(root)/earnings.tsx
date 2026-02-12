@@ -10,11 +10,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { useRouter } from "expo-router";
 import { DollarSign, TrendingUp, Clock, Calendar } from "lucide-react-native";
 import { Svg, Rect, Text as SvgText, G } from "react-native-svg";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore } from "../../store/driverStore";
-import { getEarnings, getRideHistory, mapTripToRideHistory } from "../../services/driver";
+import {
+  getEarnings,
+  getRideHistory,
+  mapTripToRideHistory,
+} from "../../services/driver";
 
 const { width } = Dimensions.get("window");
 
@@ -26,6 +31,7 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export default function Earnings() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const router = useRouter();
   const { stats, rideHistory, updateStats, setRideHistory } = useDriverStore();
   const [loading, setLoading] = useState(false);
 
@@ -40,31 +46,39 @@ export default function Earnings() {
           getRideHistory({ limit: 50 }),
         ]);
         if (cancelled) return;
-        if (earnings) updateStats({
-          todayEarnings: earnings.todayEarnings ?? 0,
-          todayRides: earnings.todayRides ?? 0,
-          weeklyEarnings: earnings.weeklyEarnings ?? 0,
-          monthlyEarnings: earnings.monthlyEarnings ?? 0,
-          totalDebt: earnings.totalDebt ?? 0,
-          totalEarnings: earnings.totalEarnings ?? 0,
-          netBalance: earnings.netBalance ?? 0,
-        });
-        if (historyRes?.rides?.length) setRideHistory(historyRes.rides.map(mapTripToRideHistory));
+        if (earnings)
+          updateStats({
+            todayEarnings: earnings.todayEarnings ?? 0,
+            todayRides: earnings.todayRides ?? 0,
+            weeklyEarnings: earnings.weeklyEarnings ?? 0,
+            monthlyEarnings: earnings.monthlyEarnings ?? 0,
+            totalDebt: earnings.totalDebt ?? 0,
+            totalEarnings: earnings.totalEarnings ?? 0,
+            netBalance: earnings.netBalance ?? 0,
+            hoursOnline: earnings.hoursOnline ?? 0,
+            weeklyData: earnings.weeklyData ?? [],
+          });
+        if (historyRes?.rides?.length)
+          setRideHistory(historyRes.rides.map(mapTripToRideHistory));
       } catch (_) {}
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Weekly chart: no per-day breakdown from API, show flat distribution for display
-  const weeklyData = useMemo(
-    () =>
-      DAY_LABELS.map((day, i) => ({
-        day,
-        amount: stats.weeklyEarnings > 0 ? Math.round(stats.weeklyEarnings / 7) : 0,
-      })),
-    [stats.weeklyEarnings]
-  );
+  // Weekly chart: use data from backend
+  const weeklyData = useMemo(() => {
+    if (stats.weeklyData && stats.weeklyData.length > 0) {
+      return stats.weeklyData;
+    }
+    return DAY_LABELS.map((day) => ({
+      day,
+      amount:
+        stats.weeklyEarnings > 0 ? Math.round(stats.weeklyEarnings / 7) : 0,
+    }));
+  }, [stats.weeklyData, stats.weeklyEarnings]);
 
   const maxAmount = Math.max(1, ...weeklyData.map((d) => d.amount));
 
@@ -108,7 +122,16 @@ export default function Earnings() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -172,7 +195,7 @@ export default function Earnings() {
         {/* Recent Activity */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t("recent_trips")}</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/history")}>
             <Text style={styles.seeAllText}>{t("see_all")}</Text>
           </TouchableOpacity>
         </View>
