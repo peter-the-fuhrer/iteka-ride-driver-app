@@ -18,7 +18,7 @@ export default function LanguageSwitcher() {
       activeOpacity={0.7}
     >
       <Languages size={18} color={Colors.gray[600]} />
-      <Text style={styles.text}>{i18n.language.toUpperCase()}</Text>
+      <Text style={styles.text}>{(i18n.language || "en").toUpperCase()}</Text>
     </TouchableOpacity>
   );
 }

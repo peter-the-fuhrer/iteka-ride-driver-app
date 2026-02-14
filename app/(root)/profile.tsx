@@ -233,7 +233,7 @@ export default function Profile() {
           <ProfileItem
             icon={Languages}
             label={t("language")}
-            value={i18n.language.toUpperCase()}
+            value={(i18n.language || "en").toUpperCase()}
             onPress={toggleLanguage}
           />
         </View>

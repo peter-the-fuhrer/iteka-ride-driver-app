@@ -11,12 +11,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // • iOS Simulator: localhost (same machine)
 // • Physical device: your machine's LAN IP (e.g. 192.168.1.113)
 // const API_URL_LOCAL = "http://10.0.2.2:5000/api"; // Android emulator
-const API_URL_LOCAL = "http://192.168.1.117:5000/api"; // Physical device / LAN
+const API_URL_LOCAL = "http://10.60.208.113:5000/api"; // Physical device / LAN
 // const API_URL_LOCAL = "http://localhost:5000/api";
 
 // Socket URL – same host as API, no /api path (must match API_URL_LOCAL host)
 // const SOCKET_URL_LOCAL = "http://10.0.2.2:5000"; // Android emulator
-const SOCKET_URL_LOCAL = "http://192.168.1.117:5000"; // Set to machine IP for discovery
+const SOCKET_URL_LOCAL = "http://10.60.208.113:5000"; // Set to machine IP for discovery
 // const SOCKET_URL_LOCAL = "http://localhost:5000";
 
 // PRODUCTION API - Render deployed backend
