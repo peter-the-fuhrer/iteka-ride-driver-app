@@ -13,6 +13,7 @@ import {
   Animated,
   StatusBar,
 } from "react-native";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,6 +27,12 @@ import {
 } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore } from "../../store/driverStore";
+import { getChatMessages } from "../../services/driver";
+import {
+  sendMessage as socketSendMessage,
+  subscribeToEvent,
+  unsubscribeFromEvent,
+} from "../../services/socket";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -49,29 +56,59 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const { activeRide } = useDriverStore();
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hello! I'm waiting at the pickup point. Please come to the south gate.",
-      sender: "customer",
-      timestamp: new Date(Date.now() - 1000 * 60 * 15),
-      status: "read",
-    },
-    {
-      id: "2",
-      text: "I'm on my way! Will be there in about 5 minutes.",
-      sender: "driver",
-      timestamp: new Date(Date.now() - 1000 * 60 * 10),
-      status: "read",
-    },
-    {
-      id: "3",
-      text: "Thanks! I'm wearing a red jacket.",
-      sender: "customer",
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-      status: "read",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch initial messages
+  useEffect(() => {
+    if (!activeRide?.id) return;
+
+    const fetchMessages = async () => {
+      try {
+        const data = await getChatMessages(activeRide.id);
+        const mappedMessages = data.map((msg: any) => ({
+          id: msg._id,
+          text: msg.text,
+          sender: msg.sender,
+          timestamp: new Date(msg.createdAt),
+          status: "read" as const,
+        }));
+        setMessages(mappedMessages);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMessages();
+  }, [activeRide?.id]);
+
+  // Listen for new messages
+  useEffect(() => {
+    const handleNewMessage = (msg: any) => {
+      // Avoid duplicating if we just sent it (though backend returns it, so we might want to replace optimistic one)
+      // For simplicity, we'll append if ID doesn't exist
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg._id)) return prev;
+        return [
+          ...prev,
+          {
+            id: msg._id,
+            text: msg.text,
+            sender: msg.sender,
+            timestamp: new Date(msg.createdAt),
+            status: "read",
+          },
+        ];
+      });
+    };
+
+    subscribeToEvent("new_message", handleNewMessage);
+    return () => {
+      unsubscribeFromEvent("new_message", handleNewMessage);
+    };
+  }, []);
 
   const flatListRef = useRef<FlatList>(null);
   const scrollAnim = useRef(new Animated.Value(0)).current;
@@ -79,20 +116,20 @@ export default function ChatScreen() {
   const sendMessage = useCallback(
     (textOverride?: string) => {
       const finalText = textOverride || message;
-      if (finalText.trim().length === 0) return;
+      if (finalText.trim().length === 0 || !activeRide?.id) return;
 
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: finalText,
-        sender: "driver",
-        timestamp: new Date(),
-        status: "sent",
-      };
+      // Send via socket
+      socketSendMessage(activeRide.id, "driver", finalText);
 
-      setMessages((prev) => [...prev, newMessage]);
+      // Optimistic updat is risky if we also listen to new_message event which brings the same message
+      // But we can filter duplicates by content/timestamp or just wait for socket echo
+      // A better way usually: Add with temp ID, then replace with real ID from socket
+      // For now, let's just rely on the socket "new_message" event which broadcasts to everyone including sender
+      // This ensures consistency. The delay is minimal for local socket.
+      // If latency is high, we'd add it to state immediately.
       setMessage("");
     },
-    [message],
+    [message, activeRide],
   );
 
   useEffect(() => {
@@ -193,7 +230,16 @@ export default function ChatScreen() {
           </View>
 
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerActionButton}>
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={() => {
+                if (activeRide?.customerPhone) {
+                  Linking.openURL(
+                    `tel:${activeRide.customerPhone.replace(/\s+/g, "")}`,
+                  );
+                }
+              }}
+            >
               <Phone size={20} color={Colors.black} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerActionButton}>

@@ -27,7 +27,8 @@ import { useRouter } from "expo-router";
 import { useDriverStore } from "../../store/driverStore";
 import { useAuthStore } from "../../store/authStore";
 import { useEffect, useState } from "react";
-import api from "../../services/api";
+import api, { API_BASE_URL } from "../../services/api";
+import * as ImagePicker from "expo-image-picker";
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
@@ -139,6 +140,59 @@ export default function Profile() {
     </TouchableOpacity>
   );
 
+  const handleAvatarPress = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      alert("Sorry, we need camera roll permissions to make this work!");
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedImage = result.assets[0];
+      await uploadProfilePicture(selectedImage.uri);
+    }
+  };
+
+  const uploadProfilePicture = async (uri: string) => {
+    try {
+      const formData = new FormData();
+      // @ts-ignore
+      formData.append("image", {
+        uri,
+        name: `profile_driver.jpg`,
+        type: "image/jpeg",
+      });
+
+      const uploadRes = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (uploadRes.data.path) {
+        const imagePath = uploadRes.data.path;
+
+        await api.put("/driver-app/profile", {
+          profile_picture: imagePath,
+        });
+
+        // Refresh profile
+        const response = await api.get(`/drivers/${driver._id}`);
+        setDriverProfile(response.data);
+      }
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      alert("Failed to upload profile picture");
+    }
+  };
+
   const toggleLanguage = () => {
     const nextLng = i18n.language === "en" ? "fr" : "en";
     i18n.changeLanguage(nextLng);
@@ -177,9 +231,26 @@ export default function Profile() {
         <View style={styles.profileHeader}>
           <View style={styles.avatarWrapper}>
             <View style={styles.avatarPlaceholder}>
-              <User size={40} color={Colors.gray[400]} />
+              {driverProfile?.profile_picture || driver?.profile_picture ? (
+                <Image
+                  source={{
+                    uri: (
+                      driverProfile?.profile_picture || driver?.profile_picture
+                    ).startsWith("http")
+                      ? driverProfile?.profile_picture ||
+                        driver?.profile_picture
+                      : `${API_BASE_URL.replace("/api", "")}${driverProfile?.profile_picture || driver?.profile_picture}`,
+                  }}
+                  style={{ width: 100, height: 100, borderRadius: 50 }}
+                />
+              ) : (
+                <User size={40} color={Colors.gray[400]} />
+              )}
             </View>
-            <TouchableOpacity style={styles.editAvatar}>
+            <TouchableOpacity
+              onPress={handleAvatarPress}
+              style={styles.editAvatar}
+            >
               <Text style={styles.editAvatarText}>{t("edit")}</Text>
             </TouchableOpacity>
           </View>

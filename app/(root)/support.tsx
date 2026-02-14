@@ -1,10 +1,10 @@
+import * as Linking from "expo-linking";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Linking,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -51,7 +51,7 @@ export default function Support() {
 
   const handleCall = () => {
     if (settings?.support_phone) {
-      Linking.openURL(`tel:${settings.support_phone}`);
+      Linking.openURL(`tel:${settings.support_phone.replace(/\s+/g, "")}`);
     }
   };
 

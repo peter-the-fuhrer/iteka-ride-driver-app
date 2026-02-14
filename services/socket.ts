@@ -58,6 +58,13 @@ export const initSocket = async (): Promise<Socket | null> => {
       handlers?.forEach((handler) => handler(data));
     });
 
+    // Listen for new messages
+    socket.on("new_message", (data) => {
+      console.log("New message received:", data);
+      const handlers = eventHandlers.get("new_message");
+      handlers?.forEach((handler) => handler(data));
+    });
+
     return socket;
   } catch (error) {
     console.error("Error initializing driver socket:", error);
@@ -98,6 +105,19 @@ export const leaveRideRoom = (tripId: string) => {
   if (socket?.connected) {
     socket.emit("leave_ride_room", { tripId });
     console.log("Left ride room:", tripId);
+  }
+};
+
+// Send a chat message via socket
+export const sendMessage = (
+  tripId: string,
+  sender: "driver" | "user",
+  text: string,
+) => {
+  if (socket?.connected) {
+    socket.emit("send_message", { tripId, sender, text });
+  } else {
+    console.warn("Socket not connected, cannot send message");
   }
 };
 

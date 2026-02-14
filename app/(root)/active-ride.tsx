@@ -27,6 +27,7 @@ import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import * as Location from "expo-location";
+import * as Linking from "expo-linking";
 import {
   updateRideState,
   getEarnings,
@@ -524,11 +525,21 @@ export default function ActiveRide() {
               <View style={styles.communicationButtons}>
                 <TouchableOpacity
                   style={[styles.circleButton, { backgroundColor: "#f0fdf4" }]}
+                  onPress={() => {
+                    router.push("/chat");
+                  }}
                 >
                   <MessageSquare size={20} color={Colors.success} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.circleButton, { backgroundColor: "#eff6ff" }]}
+                  onPress={() => {
+                    if (activeRide.customerPhone) {
+                      Linking.openURL(
+                        `tel:${activeRide.customerPhone.replace(/\s+/g, "")}`,
+                      );
+                    }
+                  }}
                 >
                   <Phone size={20} color={Colors.info} />
                 </TouchableOpacity>

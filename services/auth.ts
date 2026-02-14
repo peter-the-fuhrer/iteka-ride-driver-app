@@ -12,15 +12,13 @@ export interface Driver {
   vehicle_plate?: string;
   rating?: number;
   status?: string;
-  is_online?: boolean;
-  earnings_total?: number;
-  commission_debt?: number;
   documents?: {
     id_card_front?: string;
     id_card_back?: string;
     license?: string;
     registration?: string;
   };
+  profile_picture?: string;
 }
 
 export interface AuthResponse {
@@ -42,7 +40,10 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
       baseURL: api.defaults.baseURL,
     });
 
-    const response = await api.post<AuthResponse>("/driver-app/auth/login", data);
+    const response = await api.post<AuthResponse>(
+      "/driver-app/auth/login",
+      data,
+    );
 
     console.log("✅ Driver Login Success:", {
       status: response.status,
@@ -52,7 +53,10 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 
     // Store token and driver data
     await AsyncStorage.setItem("driverAuthToken", response.data.token);
-    await AsyncStorage.setItem("driverData", JSON.stringify(response.data.driver));
+    await AsyncStorage.setItem(
+      "driverData",
+      JSON.stringify(response.data.driver),
+    );
 
     return response.data;
   } catch (error: any) {

@@ -104,7 +104,7 @@
   "warning": "Avertissement",
 
   "alert_login_failed_title": "Échec de la connexion",
-  "alert_login_failed_msg": "Le numéro de téléphone ou le code PIN que vous avez saisi est incorrect. Veuillez réessayer.",
+  "alert_login_failed_msg": "L'email ou le mot de passe que vous avez saisi est incorrect. Veuillez réessayer.",
   "alert_go_online_title": "Passer en ligne ?",
   "alert_go_online_msg": "Vous commencerez à recevoir des demandes de course. Assurez-vous d'être prêt à accepter des courses.",
   "alert_go_offline_title": "Passer hors ligne ?",
@@ -237,5 +237,8 @@
   "email_already_exists": "Un compte avec cet email existe déjà.",
   "account_suspended": "Compte suspendu ou en attente d'approbation.",
   "unauthorized": "Email ou mot de passe invalide.",
-  "network_error": "Connexion impossible. Vérifiez votre connexion internet."
+  "network_error": "Connexion impossible. Vérifiez votre connexion internet.",
+  "invalid_credentials": "L'email ou le mot de passe que vous avez saisi est incorrect. Veuillez réessayer.",
+  "api_not_found": "Point de terminaison API non trouvé. Veuillez réessayer plus tard.",
+  "server_error": "Erreur de serveur. Veuillez réessayer plus tard."
 }

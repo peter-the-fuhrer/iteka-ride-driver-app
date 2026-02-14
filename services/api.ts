@@ -87,7 +87,7 @@ export const getApiErrorMessage = (error: any): string => {
     error.message === "Network Error" ||
     !error.response
   ) {
-    return `Network error: Unable to reach server at ${API_BASE_URL}. Please check your internet connection and ensure the server is running.`;
+    return "network_error";
   }
 
   // Server responded with error
@@ -97,16 +97,16 @@ export const getApiErrorMessage = (error: any): string => {
 
   // HTTP status code errors
   if (error.response?.status === 401) {
-    return "Invalid email or password";
+    return "unauthorized";
   }
   if (error.response?.status === 403) {
-    return "Account suspended or pending approval";
+    return "account_suspended";
   }
   if (error.response?.status === 404) {
-    return `API endpoint not found. Check if the server is running at ${API_BASE_URL}`;
+    return "api_not_found";
   }
   if (error.response?.status >= 500) {
-    return "Server error. Please try again later.";
+    return "server_error";
   }
 
   if (error.message) {

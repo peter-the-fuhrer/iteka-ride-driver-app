@@ -31,6 +31,7 @@ export interface RideHistory {
   id: string;
   date: string;
   customerName: string;
+  customerPhone: string;
   pickup: string;
   dropoff: string;
   fare: number;
@@ -151,6 +152,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
         id: activeRide.id,
         date: new Date().toISOString(),
         customerName: activeRide.customerName,
+        customerPhone: activeRide.customerPhone,
         pickup: activeRide.pickupLocation.address,
         dropoff: activeRide.dropoffLocation.address,
         fare,
@@ -189,6 +191,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
         id: activeRide.id,
         date: new Date().toISOString(),
         customerName: activeRide.customerName,
+        customerPhone: activeRide.customerPhone,
         pickup: activeRide.pickupLocation.address,
         dropoff: activeRide.dropoffLocation.address,
         fare: 0,

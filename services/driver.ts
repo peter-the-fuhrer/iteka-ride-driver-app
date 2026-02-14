@@ -150,6 +150,16 @@ export const getSettings = async (): Promise<{
   }
 };
 
+// Get chat messages for a trip
+export const getChatMessages = async (tripId: string): Promise<any[]> => {
+  try {
+    const response = await api.get(`/chat/${tripId}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(getApiErrorMessage(error));
+  }
+};
+
 export function mapTripToRideRequest(trip: Trip): RideRequest {
   const clientData = typeof trip.client_id === "object" ? trip.client_id : null;
   return {
@@ -197,6 +207,7 @@ export function mapTripToRideHistory(trip: Trip): RideHistory {
     id: trip._id,
     date: trip.createdAt ?? trip.date_time,
     customerName: clientData?.name ?? "Customer",
+    customerPhone: clientData?.phone ?? "",
     pickup: trip.pickup?.address ?? "",
     dropoff: trip.destination?.address ?? "",
     fare: trip.price ?? 0,
