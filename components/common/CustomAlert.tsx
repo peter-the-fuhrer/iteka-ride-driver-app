@@ -22,6 +22,7 @@ const { width } = Dimensions.get("window");
 export default function CustomAlert() {
   const { isVisible, config, hideAlert } = useAlertStore();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
   React.useEffect(() => {
     if (isVisible) {
@@ -30,10 +31,28 @@ export default function CustomAlert() {
         duration: 200,
         useNativeDriver: true,
       }).start();
+
+      if (config?.type === "warning") {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.05,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+          ]),
+        ).start();
+      }
     } else {
       fadeAnim.setValue(0);
+      pulseAnim.setValue(1);
     }
-  }, [isVisible]);
+  }, [isVisible, config?.type]);
 
   if (!isVisible || !config) return null;
 
@@ -85,8 +104,22 @@ export default function CustomAlert() {
 
   return (
     <Modal transparent visible={isVisible} animationType="none">
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.alertContainer, { opacity: fadeAnim }]}>
+      <View
+        style={[
+          styles.overlay,
+          config.type === "warning" && styles.warningOverlay,
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.alertContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: pulseAnim }],
+            },
+            config.type === "warning" && styles.warningContainer,
+          ]}
+        >
           <View style={styles.iconContainer}>{getIcon()}</View>
           <Text style={styles.title}>{config.title}</Text>
           <Text style={styles.message}>{config.message}</Text>
@@ -175,5 +208,12 @@ const styles = StyleSheet.create({
   },
   destructiveButtonText: {
     color: Colors.error,
+  },
+  warningOverlay: {
+    backgroundColor: "rgba(254, 202, 5, 0.3)",
+  },
+  warningContainer: {
+    borderWidth: 2,
+    borderColor: Colors.warning,
   },
 });

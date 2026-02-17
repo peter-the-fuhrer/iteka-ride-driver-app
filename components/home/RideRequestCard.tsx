@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Image,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { X, Navigation, Star } from "lucide-react-native";
 import { RideRequest } from "../../store/driverStore";
 import { Colors } from "../../constants/Colors";
+import { API_BASE_URL } from "../../services/api";
 
 interface Props {
   request: RideRequest;
@@ -100,15 +102,27 @@ export default function RideRequestCard({
         </View>
       </View>
 
-      {/* Customer Info (Optional/Subtle) */}
+      {/* Customer Info */}
       <View style={styles.customerInfo}>
-        <Text style={styles.ratingText}>
-          {request.customerRating}{" "}
-          <Star size={12} color={Colors.black} fill={Colors.black} />
-        </Text>
-        <Text style={styles.customerName}>
-          {request.customerName} ({t("rider")})
-        </Text>
+        {request.customerImage ? (
+          <Image
+            source={{
+              uri: request.customerImage.startsWith("http")
+                ? request.customerImage
+                : `${API_BASE_URL.replace("/api", "")}${request.customerImage}`,
+            }}
+            style={styles.customerAvatar}
+          />
+        ) : null}
+        <View style={styles.customerTextContainer}>
+          <Text style={styles.customerName}>
+            {request.customerName} ({t("rider")})
+          </Text>
+          <Text style={styles.ratingText}>
+            {request.customerRating}{" "}
+            <Star size={12} color={Colors.black} fill={Colors.black} />
+          </Text>
+        </View>
       </View>
 
       {/* Accept Button */}
@@ -237,10 +251,19 @@ const styles = StyleSheet.create({
   },
   customerInfo: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  customerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.gray[100],
+  },
+  customerTextContainer: {
+    flex: 1,
   },
   ratingText: {
     fontSize: 14,
@@ -249,7 +272,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
-    overflow: "hidden",
+    alignSelf: "flex-start",
+    marginTop: 2,
   },
   customerName: {
     fontSize: 14,

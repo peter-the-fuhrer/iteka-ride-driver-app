@@ -21,6 +21,7 @@
   "forgot_pin": "Code PIN oublié ?",
 
   "go_online": "Passer en ligne",
+  "going_online": "Connexion en cours...",
   "go_offline": "Passer hors ligne",
   "online": "En ligne",
   "offline": "Hors ligne",
@@ -240,5 +241,8 @@
   "network_error": "Connexion impossible. Vérifiez votre connexion internet.",
   "invalid_credentials": "L'email ou le mot de passe que vous avez saisi est incorrect. Veuillez réessayer.",
   "api_not_found": "Point de terminaison API non trouvé. Veuillez réessayer plus tard.",
-  "server_error": "Erreur de serveur. Veuillez réessayer plus tard."
+  "server_error": "Erreur de serveur. Veuillez réessayer plus tard.",
+  "dont_have_account": "Vous n'avez pas de compte ?",
+  "sign_up": "S'inscrire",
+  "type_message": "Tapez un message..."
 }

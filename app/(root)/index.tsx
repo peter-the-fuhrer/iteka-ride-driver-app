@@ -6,6 +6,9 @@ import {
   Animated,
   TouchableOpacity,
   Platform,
+  Vibration,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -28,6 +31,7 @@ import {
   subscribeToEvent,
   unsubscribeFromEvent,
   joinDriverRoom,
+  joinRideRoom,
   updateLocation as socketUpdateLocation,
 } from "../../services/socket";
 import {
@@ -60,6 +64,7 @@ export default function Home() {
     declineRide,
     currentLocation,
     setCurrentLocation,
+    activeRide,
     setActiveRide,
     setRideHistory,
     updateStats,
@@ -68,6 +73,7 @@ export default function Home() {
   const { driver } = useAuthStore();
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyleType>("streets");
+  const [isOnlineLoading, setIsOnlineLoading] = useState(false);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(
@@ -129,7 +135,12 @@ export default function Home() {
           getEarnings(),
         ]);
         if (cancelled) return;
-        if (active) setActiveRide(mapTripToActiveRide(active));
+        if (active) {
+          setActiveRide(mapTripToActiveRide(active));
+          joinRideRoom(active._id);
+          // Auto-navigate to active ride if we are on this screen
+          router.replace("/(root)/active-ride");
+        }
         if (historyRes?.rides?.length)
           setRideHistory(historyRes.rides.map(mapTripToRideHistory));
         if (earnings) {
@@ -152,6 +163,13 @@ export default function Home() {
       cancelled = true;
     };
   }, [driver?._id]);
+
+  // Strict Auto-Resume: Redirect to active ride if one exists
+  useEffect(() => {
+    if (activeRide && !rideRequest) {
+      router.replace("/(root)/active-ride");
+    }
+  }, [activeRide?.id, rideRequest]);
 
   // Listen for ride requests via Socket.IO
   useEffect(() => {
@@ -192,20 +210,46 @@ export default function Home() {
 
       setCurrentTripId(trip._id);
       setRideRequest(request);
+      // Aggressive repeating vibration for new request
+      Vibration.vibrate(
+        [0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000],
+        true,
+      );
+    };
+
+    const handleRideCancelled = (data: { tripId: string }) => {
+      console.log("Ride request cancelled:", data);
+      if (currentTripId === data.tripId || rideRequest?.id === data.tripId) {
+        setRideRequest(null);
+        setCurrentTripId(null);
+        useAlertStore.getState().showAlert({
+          title: t("ride_cancelled") || "Ride Cancelled",
+          message:
+            t("ride_cancelled_by_client") ||
+            "The client has cancelled the ride.",
+          type: "warning",
+        });
+        // Very aggressive vibration for cancellation
+        Vibration.vibrate([
+          0, 200, 100, 200, 100, 200, 100, 200, 100, 500, 100, 500, 100, 500,
+        ]);
+      }
     };
 
     if (isOnline) {
-      // Join driver room to receive ride requests
+      subscribeToEvent("new_ride_request", handleNewRideRequest);
+      subscribeToEvent("ride_cancelled", handleRideCancelled);
+
       if (driver?._id) {
         joinDriverRoom(driver._id);
       }
-      subscribeToEvent("new_ride_request", handleNewRideRequest);
     }
 
     return () => {
       unsubscribeFromEvent("new_ride_request", handleNewRideRequest);
+      unsubscribeFromEvent("ride_cancelled", handleRideCancelled);
     };
-  }, [isOnline, driver?._id]);
+  }, [isOnline, driver?._id, currentTripId, rideRequest?.id]);
 
   // Watch GPS location when driver is online (socket-based: no polling)
   useEffect(() => {
@@ -309,11 +353,12 @@ export default function Home() {
           "meters",
         );
         console.log("\n⚠️ GPS Status:");
-        if (coords.accuracy > 50) {
+        const accuracy = coords.accuracy ?? 100; // Default to 100 if null
+        if (accuracy > 50) {
           console.log("  ❌ POOR ACCURACY - GPS signal is weak!");
-        } else if (coords.accuracy > 20) {
+        } else if (accuracy > 20) {
           console.log("  ⚠️ FAIR ACCURACY - GPS could be better");
-        } else if (coords.accuracy > 10) {
+        } else if (accuracy > 10) {
           console.log("  ✅ GOOD ACCURACY");
         } else {
           console.log("  ✅✅ EXCELLENT ACCURACY");
@@ -326,6 +371,7 @@ export default function Home() {
           latitude: lat0,
           longitude: lng0,
           heading: head0 ?? 0,
+          accuracy: 0,
         });
         socketUpdateLocation(driver._id, lat0, lng0);
         if (!hasZoomedToLocation.current && mapRef.current) {
@@ -357,11 +403,16 @@ export default function Home() {
               latitude,
               longitude,
               heading,
-              accuracy,
+              accuracy: accuracy ?? 0,
               timestamp: new Date().toISOString(),
             });
 
-            setCurrentLocation({ latitude, longitude, heading: heading ?? 0 });
+            setCurrentLocation({
+              latitude,
+              longitude,
+              heading: heading ?? 0,
+              accuracy: accuracy ?? 0,
+            });
             socketUpdateLocation(driver._id, latitude, longitude);
             setIsLocationEnabled(true); // If we get an update, it's enabled
           },
@@ -382,6 +433,7 @@ export default function Home() {
             latitude: -3.3822,
             longitude: 29.3644,
             heading: 0,
+            accuracy: 0,
           });
         }
       }
@@ -417,10 +469,12 @@ export default function Home() {
   }, [currentLocation]);
 
   const handleAccept = async () => {
+    Vibration.cancel();
     if (!currentTripId) return;
     try {
       const trip = await apiAcceptRide(currentTripId);
       setActiveRide(mapTripToActiveRide(trip));
+      joinRideRoom(trip._id);
       setRideRequest(null);
       setCurrentTripId(null);
       router.push("/(root)/active-ride");
@@ -450,8 +504,13 @@ export default function Home() {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      const { latitude, longitude, heading } = loc.coords;
-      setCurrentLocation({ latitude, longitude, heading: heading ?? 0 });
+      const { latitude, longitude, heading, accuracy } = loc.coords;
+      setCurrentLocation({
+        latitude,
+        longitude,
+        heading: heading ?? 0,
+        accuracy: accuracy ?? 10,
+      });
 
       // Zoom to location immediately when going online
       if (mapRef.current) {
@@ -477,6 +536,7 @@ export default function Home() {
           {
             text: t("yes_go_online"),
             onPress: async () => {
+              setIsOnlineLoading(true);
               try {
                 // Call API to update status with current location
                 await updateStatus({
@@ -485,11 +545,6 @@ export default function Home() {
                   lng: longitude,
                 });
                 setOnlineStatus(true);
-
-                // Join driver room for ride requests
-                if (driver?._id) {
-                  joinDriverRoom(driver._id);
-                }
               } catch (error: any) {
                 console.error("Failed to go online:", error);
                 useAlertStore.getState().showAlert({
@@ -497,6 +552,8 @@ export default function Home() {
                   message: error.message || "Failed to go online",
                   type: "error",
                 });
+              } finally {
+                setIsOnlineLoading(false);
               }
             },
           },
@@ -545,7 +602,10 @@ export default function Home() {
           <RideRequestCard
             request={rideRequest}
             onAccept={handleAccept}
-            onDecline={declineRide}
+            onDecline={() => {
+              Vibration.cancel();
+              declineRide();
+            }}
           />
         </BottomSheetView>
       );
@@ -764,6 +824,23 @@ export default function Home() {
       >
         {renderBottomSheetContent()}
       </BottomSheet>
+
+      {/* Loading Modal */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isOnlineLoading}
+        onRequestClose={() => setIsOnlineLoading(false)}
+      >
+        <View style={styles.loadingModalContainer}>
+          <View style={styles.loadingModalContent}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingModalText}>
+              {t("going_online") || "Going online..."}
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1021,5 +1098,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
+  },
+  loadingModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingModalContent: {
+    backgroundColor: Colors.white,
+    padding: 30,
+    borderRadius: 20,
+    alignItems: "center",
+    gap: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  loadingModalText: {
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 16,
+    color: Colors.gray[800],
   },
 });

@@ -1,9 +1,10 @@
 import { Tabs, Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Home, DollarSign, Clock, User } from "lucide-react-native";
-import { Platform } from "react-native";
+import { Platform, Image } from "react-native";
 import { Colors } from "../../constants/Colors";
 import { useAuthStore } from "../../store/authStore";
+import { API_BASE_URL } from "../../services/api";
 
 export default function RootLayout() {
   const { t } = useTranslation();
@@ -60,7 +61,28 @@ export default function RootLayout() {
         name="profile"
         options={{
           title: t("profile"),
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => {
+            const driver = useAuthStore.getState().driver;
+            if (driver?.profile_picture) {
+              return (
+                <Image
+                  source={{
+                    uri: driver.profile_picture.startsWith("http")
+                      ? driver.profile_picture
+                      : `${API_BASE_URL.replace("/api", "")}${driver.profile_picture}`,
+                  }}
+                  style={{
+                    width: size,
+                    height: size,
+                    borderRadius: size / 2,
+                    borderWidth: 1,
+                    borderColor: color,
+                  }}
+                />
+              );
+            }
+            return <User size={size} color={color} />;
+          },
         }}
       />
       <Tabs.Screen
@@ -95,6 +117,12 @@ export default function RootLayout() {
       />
       <Tabs.Screen
         name="notifications"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="chat/index"
         options={{
           href: null,
         }}

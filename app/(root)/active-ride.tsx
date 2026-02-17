@@ -6,6 +6,8 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Vibration,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -27,6 +29,7 @@ import { useAlertStore } from "../../store/alertStore";
 import { useRouter } from "expo-router";
 import { useMemo, useRef, useState, useEffect } from "react";
 import * as Location from "expo-location";
+import { API_BASE_URL } from "../../services/api";
 import * as Linking from "expo-linking";
 import {
   updateRideState,
@@ -34,7 +37,13 @@ import {
   getRideHistory,
   mapTripToRideHistory,
 } from "../../services/driver";
-import { updateLocation } from "../../services/socket";
+import {
+  updateLocation,
+  subscribeToEvent,
+  unsubscribeFromEvent,
+  joinRideRoom,
+  leaveRideRoom,
+} from "../../services/socket";
 
 const { width, height } = Dimensions.get("window");
 
@@ -54,6 +63,7 @@ export default function ActiveRide() {
     setActiveRide,
     setRideHistory,
     updateStats,
+    setOnlineStatus,
   } = useDriverStore();
 
   // Driver location: real GPS when available, fallback to pickup offset
@@ -71,6 +81,7 @@ export default function ActiveRide() {
     Array<{ latitude: number; longitude: number }>
   >([]);
   const [carHeading, setCarHeading] = useState(0); // Car rotation angle
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["45%", "80%"], []);
@@ -152,6 +163,12 @@ export default function ActiveRide() {
         ...activeRide.pickupLocation.coordinates,
         heading: 0,
       });
+    }
+  }, [activeRide?.id]);
+
+  useEffect(() => {
+    if (activeRide?.id) {
+      joinRideRoom(activeRide.id);
     }
   }, [activeRide?.id]);
 
@@ -244,6 +261,59 @@ export default function ActiveRide() {
     };
   }, [activeRide?.id, driver?._id]);
 
+  // Listen for ride cancellation by client
+  useEffect(() => {
+    if (!activeRide) return;
+
+    const handleRideCancelled = (data: { tripId: string }) => {
+      console.log("Active ride cancelled by client:", data);
+      if (activeRide.id === data.tripId) {
+        useAlertStore.getState().showAlert({
+          title: t("ride_cancelled") || "Ride Cancelled",
+          message:
+            t("ride_cancelled_by_client") ||
+            "The client has cancelled this ride.",
+          type: "warning",
+        });
+        // Very aggressive vibration for cancellation
+        Vibration.vibrate([
+          0, 200, 100, 200, 100, 200, 100, 200, 100, 500, 100, 500, 100, 500,
+        ]);
+        setActiveRide(null);
+        router.replace("/(root)");
+      }
+    };
+
+    subscribeToEvent("ride_cancelled", handleRideCancelled);
+
+    const handleRideStatusUpdate = (data: any) => {
+      console.log("Ride status update in driver active ride:", data.status);
+      if (data._id === activeRide.id && data.status === "cancelled") {
+        useAlertStore.getState().showAlert({
+          title: t("ride_cancelled") || "Ride Cancelled",
+          message:
+            t("ride_cancelled_by_client") ||
+            "The client has cancelled this ride.",
+          type: "warning",
+        });
+        // Very aggressive vibration for cancellation
+        Vibration.vibrate([
+          0, 200, 100, 200, 100, 200, 100, 200, 100, 500, 100, 500, 100, 500,
+        ]);
+        setActiveRide(null);
+        router.replace("/(root)");
+      }
+    };
+
+    subscribeToEvent("ride_status_update", handleRideStatusUpdate);
+    joinRideRoom(activeRide.id);
+
+    return () => {
+      unsubscribeFromEvent("ride_cancelled", handleRideCancelled);
+      unsubscribeFromEvent("ride_status_update", handleRideStatusUpdate);
+    };
+  }, [activeRide?.id]);
+
   // Optional: animate car heading from route when we have route coords (for map rotation)
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   useEffect(() => {
@@ -308,8 +378,6 @@ export default function ActiveRide() {
     );
   }
 
-  const [isActionLoading, setIsActionLoading] = useState(false);
-
   const handleAction = async () => {
     const tripId = activeRide.id;
     setIsActionLoading(true);
@@ -335,6 +403,7 @@ export default function ActiveRide() {
                 try {
                   await updateRideState(tripId, "completed");
                   setActiveRide(null);
+                  setOnlineStatus(true);
                   try {
                     const [earnings, historyRes] = await Promise.all([
                       getEarnings(),
@@ -397,6 +466,7 @@ export default function ActiveRide() {
               const tripId = activeRide.id;
               await updateRideState(tripId, "cancelled");
               setActiveRide(null);
+              setOnlineStatus(true); // Ensure driver is back online
               try {
                 const historyRes = await getRideHistory({ limit: 50 });
                 if (historyRes?.rides?.length) {
@@ -512,7 +582,18 @@ export default function ActiveRide() {
           <View style={styles.customerSection}>
             <View style={styles.customerRow}>
               <View style={styles.avatar}>
-                <User size={28} color={Colors.gray[500]} />
+                {activeRide.customerImage ? (
+                  <Image
+                    source={{
+                      uri: activeRide.customerImage.startsWith("http")
+                        ? activeRide.customerImage
+                        : `${API_BASE_URL.replace("/api", "")}${activeRide.customerImage}`,
+                    }}
+                    style={{ width: 56, height: 56, borderRadius: 28 }}
+                  />
+                ) : (
+                  <User size={28} color={Colors.gray[500]} />
+                )}
               </View>
               <View style={styles.customerInfo}>
                 <Text style={styles.customerName}>
@@ -526,7 +607,7 @@ export default function ActiveRide() {
                 <TouchableOpacity
                   style={[styles.circleButton, { backgroundColor: "#f0fdf4" }]}
                   onPress={() => {
-                    router.push("/chat");
+                    router.push("/(root)/chat");
                   }}
                 >
                   <MessageSquare size={20} color={Colors.success} />

@@ -16,6 +16,7 @@ export interface TripClient {
   name: string;
   phone: string;
   rating?: number;
+  profile_picture?: string;
 }
 
 export interface Trip {
@@ -170,6 +171,7 @@ export function mapTripToRideRequest(trip: Trip): RideRequest {
     customerName: clientData?.name ?? "Customer",
     customerRating: clientData?.rating ?? 4.5,
     customerPhone: clientData?.phone ?? "",
+    customerImage: clientData?.profile_picture,
     pickupLocation: {
       address: trip.pickup.address,
       coordinates: { latitude: trip.pickup.lat, longitude: trip.pickup.lng },
@@ -208,6 +210,7 @@ export function mapTripToRideHistory(trip: Trip): RideHistory {
     date: trip.createdAt ?? trip.date_time,
     customerName: clientData?.name ?? "Customer",
     customerPhone: clientData?.phone ?? "",
+    customerImage: clientData?.profile_picture,
     pickup: trip.pickup?.address ?? "",
     dropoff: trip.destination?.address ?? "",
     fare: trip.price ?? 0,

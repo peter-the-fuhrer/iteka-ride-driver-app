@@ -21,6 +21,7 @@
   "forgot_pin": "Forgot PIN?",
 
   "go_online": "Go Online",
+  "going_online": "Going online...",
   "go_offline": "Go Offline",
   "online": "Online",
   "offline": "Offline",
@@ -240,5 +241,8 @@
   "network_error": "Unable to connect. Please check your internet connection.",
   "invalid_credentials": "The email or password you entered is incorrect. Please try again.",
   "api_not_found": "API endpoint not found. Please try again later.",
-  "server_error": "Server error. Please try again later."
+  "server_error": "Server error. Please try again later.",
+  "dont_have_account": "Don't have an account?",
+  "sign_up": "Sign Up",
+  "type_message": "Type a message..."
 }

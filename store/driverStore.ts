@@ -6,6 +6,7 @@ export interface RideRequest {
   customerName: string;
   customerRating: number;
   customerPhone: string;
+  customerImage?: string;
   pickupLocation: {
     address: string;
     coordinates: { latitude: number; longitude: number };
@@ -32,6 +33,7 @@ export interface RideHistory {
   date: string;
   customerName: string;
   customerPhone: string;
+  customerImage?: string;
   pickup: string;
   dropoff: string;
   fare: number;
@@ -61,11 +63,13 @@ interface DriverState {
     latitude: number;
     longitude: number;
     heading?: number;
+    accuracy?: number;
   } | null;
   rideRequest: RideRequest | null;
   activeRide: ActiveRide | null;
   rideHistory: RideHistory[];
   stats: DriverStats;
+  chatMessages: any[];
 
   // Actions
   setOnlineStatus: (status: boolean) => void;
@@ -73,6 +77,7 @@ interface DriverState {
     latitude: number;
     longitude: number;
     heading: number;
+    accuracy: number;
   }) => void;
   setRideRequest: (request: RideRequest | null) => void;
   acceptRide: () => void;
@@ -84,6 +89,9 @@ interface DriverState {
   setActiveRide: (ride: ActiveRide | null) => void;
   setRideHistory: (rides: RideHistory[]) => void;
   updateStats: (stats: Partial<DriverStats>) => void;
+  setChatMessages: (messages: any[]) => void;
+  addChatMessage: (message: any) => void;
+  clearChatMessages: () => void;
   reset: () => void;
 }
 
@@ -107,6 +115,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
   activeRide: null,
   rideHistory: [],
   stats: initialStats,
+  chatMessages: [],
 
   setOnlineStatus: (status) => set({ isOnline: status }),
 
@@ -180,6 +189,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
           totalDebt: newTotalDebt,
           netBalance: newNetBalance,
         },
+        chatMessages: [],
       });
     }
   },
@@ -204,6 +214,7 @@ export const useDriverStore = create<DriverState>((set, get) => ({
       set({
         activeRide: null,
         rideHistory: [cancelledRide, ...get().rideHistory],
+        chatMessages: [],
       });
     }
   },
@@ -212,6 +223,42 @@ export const useDriverStore = create<DriverState>((set, get) => ({
 
   updateStats: (newStats) => set({ stats: { ...get().stats, ...newStats } }),
 
+  setChatMessages: (messages) => set({ chatMessages: messages }),
+
+  addChatMessage: (message) =>
+    set((state) => {
+      // 1. Check if exact message already exists
+      const exists = state.chatMessages.find(
+        (m) => m.id === message.id || (message._id && m.id === message._id),
+      );
+      if (exists) return state;
+
+      // 2. Check if this is a server confirmation of an optimistic message
+      const optimisticMatch = state.chatMessages.find(
+        (m) =>
+          m.id.startsWith("temp-") &&
+          m.text === message.text &&
+          m.sender === message.sender &&
+          Math.abs(
+            new Date(m.timestamp).getTime() -
+              new Date(message.timestamp).getTime(),
+          ) < 10000,
+      );
+
+      if (optimisticMatch) {
+        // Replace temp with real
+        return {
+          chatMessages: state.chatMessages.map((m) =>
+            m.id === optimisticMatch.id ? message : m,
+          ),
+        };
+      }
+
+      return { chatMessages: [...state.chatMessages, message] };
+    }),
+
+  clearChatMessages: () => set({ chatMessages: [] }),
+
   reset: () =>
     set({
       isOnline: false,
@@ -219,5 +266,6 @@ export const useDriverStore = create<DriverState>((set, get) => ({
       activeRide: null,
       rideHistory: [],
       stats: initialStats,
+      chatMessages: [],
     }),
 }));

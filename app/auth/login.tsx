@@ -11,10 +11,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useState } from "react";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
+import { Linking } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, Mail, Lock } from "lucide-react-native";
+import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useAlertStore } from "../../store/alertStore";
 import { useAuthStore } from "../../store/authStore";
@@ -25,6 +26,7 @@ export default function Login() {
   const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,7 +54,9 @@ export default function Login() {
     } else {
       useAlertStore.getState().showAlert({
         title: t("alert_login_failed_title") || "Login Failed",
-        message: error ? t(error, { defaultValue: error }) : t("invalid_credentials"),
+        message: error
+          ? t(error, { defaultValue: error })
+          : t("invalid_credentials"),
         type: "error",
       });
     }
@@ -122,20 +126,35 @@ export default function Login() {
                 placeholderTextColor="#9ca3af"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 onFocus={() => setFocusedField("password")}
                 onBlur={() => setFocusedField(null)}
                 editable={!isLoading}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIcon}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color="#9ca3af" />
+                ) : (
+                  <Eye size={20} color="#9ca3af" />
+                )}
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.forgotPin}>
-              <Text style={styles.forgotPinText}>{t("forgot_password") || "Forgot password?"}</Text>
+              <Text style={styles.forgotPinText}>
+                {t("forgot_password") || "Forgot password?"}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleLogin}
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              style={[
+                styles.loginButton,
+                isLoading && styles.loginButtonDisabled,
+              ]}
               activeOpacity={0.8}
               disabled={isLoading}
             >
@@ -145,6 +164,19 @@ export default function Login() {
                 <Text style={styles.loginButtonText}>{t("login")}</Text>
               )}
             </TouchableOpacity>
+
+            <View style={styles.signupContainer}>
+              <Text style={styles.noAccountText}>{t("dont_have_account")}</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  Linking.openURL(
+                    "https://iteka-ride-dashboard.vercel.app/register-driver",
+                  )
+                }
+              >
+                <Text style={styles.signupText}>{t("sign_up")}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -267,5 +299,25 @@ const styles = StyleSheet.create({
     color: "black",
     fontSize: 18,
     fontFamily: "Poppins_600SemiBold",
+  },
+  eyeIcon: {
+    padding: 4,
+  },
+  signupContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 16,
+    gap: 8,
+  },
+  noAccountText: {
+    color: "#6b7280",
+    fontFamily: "Poppins_400Regular",
+    fontSize: 14,
+  },
+  signupText: {
+    color: Colors.primary,
+    fontFamily: "Poppins_600SemiBold",
+    fontSize: 14,
   },
 });

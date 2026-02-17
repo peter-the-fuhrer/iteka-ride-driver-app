@@ -11,12 +11,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // • iOS Simulator: localhost (same machine)
 // • Physical device: your machine's LAN IP (e.g. 192.168.1.113)
 // const API_URL_LOCAL = "http://10.0.2.2:5000/api"; // Android emulator
-const API_URL_LOCAL = "http://10.60.208.113:5000/api"; // Physical device / LAN
+const API_URL_LOCAL = "http://10.97.107.113:5000/api"; // Physical device / LAN
 // const API_URL_LOCAL = "http://localhost:5000/api";
 
 // Socket URL – same host as API, no /api path (must match API_URL_LOCAL host)
 // const SOCKET_URL_LOCAL = "http://10.0.2.2:5000"; // Android emulator
-const SOCKET_URL_LOCAL = "http://10.60.208.113:5000"; // Set to machine IP for discovery
+const SOCKET_URL_LOCAL = "http://10.97.107.113:5000"; // Set to machine IP for discovery
 // const SOCKET_URL_LOCAL = "http://localhost:5000";
 
 // PRODUCTION API - Render deployed backend
@@ -25,7 +25,7 @@ const API_URL_PROD = "https://iteka-ride-backend.onrender.com/api";
 // ============================================
 // ACTIVE ENVIRONMENT – use local for emulators
 // ============================================
-const IS_PRODUCTION = true; // true = production, false = local (emulators / device)
+const IS_PRODUCTION = false; // true = production, false = local (emulators / device)
 
 export const API_BASE_URL = IS_PRODUCTION ? API_URL_PROD : API_URL_LOCAL;
 export const SOCKET_URL = IS_PRODUCTION

@@ -1,0 +1,49 @@
+diff --git a/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageActivity.kt b/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageActivity.kt
+index 59ca718..c31dd89 100644
+--- a/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageActivity.kt
++++ b/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageActivity.kt
+@@ -54,8 +54,8 @@ class ExpoCropImageActivity : CropImageActivity() {
+     val toolbarColor = opts.toolbarColor ?: defaultToolbarColor
+     ExpoCropImageUtils.applyWindowTheming(window, toolbarColor, isNight)
+ 
+-    // Remove action bar elevation for a flat design
+-    supportActionBar?.elevation = 0f
++    // Set action bar elevation to ensure it stays above the content
++    supportActionBar?.elevation = 4f
+   }
+ 
+   // region Helper Methods
+diff --git a/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml b/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml
+index 1d9e07f..fef1484 100644
+--- a/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml
++++ b/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml
+@@ -2,9 +2,9 @@
+ <resources>
+     <!-- Custom colors for image picker cropping interface -->
+     <!-- Dark mode defaults -->
+-    <color name="expoCropToolbarColor">#00000000</color> <!-- Transparent -->
+-    <color name="expoCropToolbarIconColor">#ffffff</color> <!-- White icons -->
+-    <color name="expoCropToolbarActionTextColor">#ffffff</color> <!-- White text -->
+-    <color name="expoCropBackButtonIconColor">#ffffff</color> <!-- White back button -->
++    <color name="expoCropToolbarColor">#feca05</color> <!-- App Primary Yellow -->
++    <color name="expoCropToolbarIconColor">#000000</color> <!-- Black icons -->
++    <color name="expoCropToolbarActionTextColor">#000000</color> <!-- Black text -->
++    <color name="expoCropBackButtonIconColor">#000000</color> <!-- Black back button -->
+     <color name="expoCropBackgroundColor">#000000</color> <!-- Black background -->
+ </resources>
+diff --git a/node_modules/expo-image-picker/android/src/main/res/values/colors.xml b/node_modules/expo-image-picker/android/src/main/res/values/colors.xml
+index f10bea3..81b458d 100644
+--- a/node_modules/expo-image-picker/android/src/main/res/values/colors.xml
++++ b/node_modules/expo-image-picker/android/src/main/res/values/colors.xml
+@@ -2,9 +2,9 @@
+ <resources>
+     <!-- Custom colors for image picker cropping interface -->
+     <!-- Light mode defaults -->
+-    <color name="expoCropToolbarColor">#00000000</color> <!-- Transparent -->
++    <color name="expoCropToolbarColor">#feca05</color> <!-- App Primary Yellow -->
+     <color name="expoCropToolbarIconColor">#000000</color> <!-- Black icons -->
+     <color name="expoCropToolbarActionTextColor">#000000</color> <!-- Black text -->
+     <color name="expoCropBackButtonIconColor">#000000</color> <!-- Black back button -->
+-    <color name="expoCropBackgroundColor">#ffffff</color> <!-- White background -->
++    <color name="expoCropBackgroundColor">#000000</color> <!-- Black background (standard for editors) -->
+ </resources>

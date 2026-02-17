@@ -5,14 +5,22 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
-import { Clock, MapPin, Calendar, ChevronRight } from "lucide-react-native";
+import {
+  Clock,
+  MapPin,
+  Calendar,
+  ChevronRight,
+  User,
+} from "lucide-react-native";
 import { useDriverStore, RideHistory } from "../../store/driverStore";
 import { Colors } from "../../constants/Colors";
 import { getRideHistory, mapTripToRideHistory } from "../../services/driver";
+import { API_BASE_URL } from "../../services/api";
 
 export default function History() {
   const insets = useSafeAreaInsets();
@@ -31,7 +39,9 @@ export default function History() {
       } catch (_) {}
       if (!cancelled) setLoading(false);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const renderItem = ({ item }: { item: RideHistory }) => (
@@ -73,11 +83,27 @@ export default function History() {
       </View>
 
       <View style={styles.rideFooter}>
-        <View>
-          <Text style={styles.customerName}>{item.customerName}</Text>
-          <Text style={styles.rideStats}>
-            {item.distance} km • {item.duration} min
-          </Text>
+        <View style={styles.customerContainer}>
+          {item.customerImage ? (
+            <Image
+              source={{
+                uri: item.customerImage.startsWith("http")
+                  ? item.customerImage
+                  : `${API_BASE_URL.replace("/api", "")}${item.customerImage}`,
+              }}
+              style={styles.customerAvatar}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <User size={16} color={Colors.gray[400]} />
+            </View>
+          )}
+          <View>
+            <Text style={styles.customerName}>{item.customerName}</Text>
+            <Text style={styles.rideStats}>
+              {item.distance} km • {item.duration} min
+            </Text>
+          </View>
         </View>
         <Text style={styles.fareText}>{item.fare.toLocaleString()} FBU</Text>
       </View>
@@ -86,7 +112,16 @@ export default function History() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: "center", alignItems: "center" }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -211,6 +246,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Poppins_700Bold",
     color: Colors.black,
+  },
+  customerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  customerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.gray[200],
+  },
+  avatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.gray[100],
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyContainer: {
     flex: 1,
