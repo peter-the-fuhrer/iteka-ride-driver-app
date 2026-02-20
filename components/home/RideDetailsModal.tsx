@@ -91,10 +91,6 @@ export const RideDetailsModal = forwardRef<BottomSheetModal, Props>(
                   })}
                 </Text>
               </View>
-              <View style={styles.statItem}>
-                <Star size={16} color={Colors.warning} fill={Colors.warning} />
-                <Text style={styles.statText}>{ride.rating || "N/A"}</Text>
-              </View>
             </View>
 
             {/* Locations */}

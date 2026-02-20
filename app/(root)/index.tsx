@@ -86,17 +86,21 @@ export default function Home() {
 
   // Snap points
   const snapPoints = useMemo(() => {
-    return rideRequest ? ["50%"] : ["25%"];
+    return rideRequest ? ["35%", "55%"] : ["25%", "45%"];
   }, [rideRequest]);
 
   // Expand or collapse based on state
   useEffect(() => {
-    if (rideRequest) {
-      bottomSheetRef.current?.expand();
-    } else {
-      bottomSheetRef.current?.snapToIndex(0);
+    if (bottomSheetRef.current) {
+      // Always snap to the second index (Expanded view) for both ride requests and dashboard
+      // Index 1 for ["35%", "55%"] is 55%
+      // Index 1 for ["25%", "45%"] is 45%
+      const timer = setTimeout(() => {
+        bottomSheetRef.current?.snapToIndex(1);
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [rideRequest]);
+  }, [rideRequest, isOnline]);
 
   // Pulse animation for waiting state
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -188,6 +192,7 @@ export default function Home() {
         customerName: clientData?.name || "Customer",
         customerRating: clientData?.rating || 4.5,
         customerPhone: clientData?.phone || "",
+        customerImage: clientData?.profile_picture || "",
         pickupLocation: {
           address: trip.pickup.address,
           coordinates: {
@@ -229,7 +234,8 @@ export default function Home() {
             "The client has cancelled the ride.",
           type: "warning",
         });
-        // Very aggressive vibration for cancellation
+        // Stop current ringing vibration and play cancellation pattern
+        Vibration.cancel();
         Vibration.vibrate([
           0, 200, 100, 200, 100, 200, 100, 200, 100, 500, 100, 500, 100, 500,
         ]);
@@ -481,7 +487,7 @@ export default function Home() {
     } catch (error: any) {
       useAlertStore.getState().showAlert({
         title: t("error") || "Error",
-        message: error.message || "Could not accept ride",
+        message: t(error.message, { defaultValue: error.message }),
         type: "error",
       });
     }
@@ -549,7 +555,7 @@ export default function Home() {
                 console.error("Failed to go online:", error);
                 useAlertStore.getState().showAlert({
                   title: t("error") || "Error",
-                  message: error.message || "Failed to go online",
+                  message: t(error.message, { defaultValue: error.message }),
                   type: "error",
                 });
               } finally {
@@ -656,10 +662,10 @@ export default function Home() {
         userLocation={
           currentLocation
             ? {
-                latitude: currentLocation.latitude,
-                longitude: currentLocation.longitude,
-                heading: currentLocation.heading,
-              }
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+              heading: currentLocation.heading,
+            }
             : null
         }
       />
@@ -811,6 +817,7 @@ export default function Home() {
       <BottomSheet
         ref={bottomSheetRef}
         snapPoints={snapPoints}
+        index={1}
         enablePanDownToClose={false}
         handleIndicatorStyle={{
           backgroundColor: Colors.gray[300],
@@ -1016,6 +1023,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontFamily: "Poppins_600SemiBold",
     fontSize: 16,
+    textAlign: "center",
   },
   pulseContainer: {
     ...StyleSheet.absoluteFillObject,

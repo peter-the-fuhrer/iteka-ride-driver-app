@@ -13,8 +13,37 @@ index 59ca718..c31dd89 100644
    }
  
    // region Helper Methods
+diff --git a/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageUtils.kt b/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageUtils.kt
+index a876bbc..8937b18 100644
+--- a/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageUtils.kt
++++ b/node_modules/expo-image-picker/android/src/main/java/expo/modules/imagepicker/ExpoCropImageUtils.kt
+@@ -57,15 +57,16 @@ object ExpoCropImageUtils {
+     val customBg = getThemeColor(theme, R.attr.expoCropBackgroundColor)
+       ?: getColorResource(resources, R.color.expoCropBackgroundColor)
+ 
+-    val defaultColor = if (isNight) Color.BLACK else Color.WHITE
+-    val toolbarWidgetColor = customIconColor ?: if (isNight) Color.WHITE else Color.BLACK
++    val defaultBg = Color.BLACK
++    val defaultToolbar = Color.WHITE
++    val defaultWidget = Color.BLACK
+ 
+-    options.activityBackgroundColor = customBg ?: defaultColor
+-    options.toolbarColor = customToolbar ?: defaultColor
+-    options.toolbarTitleColor = toolbarWidgetColor
+-    options.toolbarBackButtonColor = customBackButtonIconColor ?: toolbarWidgetColor
+-    options.activityMenuIconColor = toolbarWidgetColor
+-    options.activityMenuTextColor = customActionTextColor ?: if (isNight) Color.WHITE else Color.BLACK
++    options.activityBackgroundColor = customBg ?: defaultBg
++    options.toolbarColor = customToolbar ?: defaultToolbar
++    options.toolbarTitleColor = Color.BLACK
++    options.toolbarBackButtonColor = customBackButtonIconColor ?: defaultWidget
++    options.activityMenuIconColor = defaultWidget
++    options.activityMenuTextColor = customActionTextColor ?: defaultWidget
+ 
+     return toolbarWidgetColor
+   }
 diff --git a/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml b/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml
-index 1d9e07f..fef1484 100644
+index 1d9e07f..6800f01 100644
 --- a/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml
 +++ b/node_modules/expo-image-picker/android/src/main/res/values-night/colors.xml
 @@ -2,9 +2,9 @@
@@ -25,14 +54,14 @@ index 1d9e07f..fef1484 100644
 -    <color name="expoCropToolbarIconColor">#ffffff</color> <!-- White icons -->
 -    <color name="expoCropToolbarActionTextColor">#ffffff</color> <!-- White text -->
 -    <color name="expoCropBackButtonIconColor">#ffffff</color> <!-- White back button -->
-+    <color name="expoCropToolbarColor">#feca05</color> <!-- App Primary Yellow -->
++    <color name="expoCropToolbarColor">#ffffff</color> <!-- White toolbar -->
 +    <color name="expoCropToolbarIconColor">#000000</color> <!-- Black icons -->
 +    <color name="expoCropToolbarActionTextColor">#000000</color> <!-- Black text -->
 +    <color name="expoCropBackButtonIconColor">#000000</color> <!-- Black back button -->
      <color name="expoCropBackgroundColor">#000000</color> <!-- Black background -->
  </resources>
 diff --git a/node_modules/expo-image-picker/android/src/main/res/values/colors.xml b/node_modules/expo-image-picker/android/src/main/res/values/colors.xml
-index f10bea3..81b458d 100644
+index f10bea3..182bb59 100644
 --- a/node_modules/expo-image-picker/android/src/main/res/values/colors.xml
 +++ b/node_modules/expo-image-picker/android/src/main/res/values/colors.xml
 @@ -2,9 +2,9 @@
@@ -40,10 +69,10 @@ index f10bea3..81b458d 100644
      <!-- Custom colors for image picker cropping interface -->
      <!-- Light mode defaults -->
 -    <color name="expoCropToolbarColor">#00000000</color> <!-- Transparent -->
-+    <color name="expoCropToolbarColor">#feca05</color> <!-- App Primary Yellow -->
++    <color name="expoCropToolbarColor">#ffffff</color> <!-- White toolbar -->
      <color name="expoCropToolbarIconColor">#000000</color> <!-- Black icons -->
      <color name="expoCropToolbarActionTextColor">#000000</color> <!-- Black text -->
      <color name="expoCropBackButtonIconColor">#000000</color> <!-- Black back button -->
 -    <color name="expoCropBackgroundColor">#ffffff</color> <!-- White background -->
-+    <color name="expoCropBackgroundColor">#000000</color> <!-- Black background (standard for editors) -->
++    <color name="expoCropBackgroundColor">#000000</color> <!-- Black background -->
  </resources>

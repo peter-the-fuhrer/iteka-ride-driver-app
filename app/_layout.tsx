@@ -21,6 +21,7 @@ import {
 import "../i18n";
 import { Colors } from "../constants/Colors";
 import CustomAlert from "../components/common/CustomAlert";
+import GlobalConnectionHandler from "../components/common/GlobalConnectionHandler";
 import { useAuthStore } from "../store/authStore";
 import { initSocket, disconnectSocket } from "../services/socket";
 
@@ -83,6 +84,7 @@ export default function RootLayout() {
         </Stack>
         <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
         <CustomAlert />
+        <GlobalConnectionHandler />
       </ThemeProvider>
     </GestureHandlerRootView>
   );

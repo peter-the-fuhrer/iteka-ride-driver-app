@@ -36,7 +36,7 @@ export default function History() {
         if (!cancelled && res?.rides?.length) {
           setRideHistory(res.rides.map(mapTripToRideHistory));
         }
-      } catch (_) {}
+      } catch (_) { }
       if (!cancelled) setLoading(false);
     })();
     return () => {
@@ -101,7 +101,7 @@ export default function History() {
           <View>
             <Text style={styles.customerName}>{item.customerName}</Text>
             <Text style={styles.rideStats}>
-              {item.distance} km • {item.duration} min
+              {item.distance.toFixed(2)} km • {item.duration} min
             </Text>
           </View>
         </View>

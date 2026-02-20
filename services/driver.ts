@@ -24,8 +24,8 @@ export interface Trip {
   client_id: TripClient | string;
   driver_id?: string;
   ride_type_id?:
-    | string
-    | { _id: string; name: string; is_ride: boolean; is_delivery: boolean };
+  | string
+  | { _id: string; name: string; is_ride: boolean; is_delivery: boolean };
   trip_type?: "ride" | "delivery";
   pickup: {
     address: string;
@@ -40,12 +40,12 @@ export interface Trip {
   distance: number;
   price: number;
   status:
-    | "request"
-    | "driver_assigned"
-    | "driver_arrived"
-    | "ongoing"
-    | "completed"
-    | "cancelled";
+  | "request"
+  | "driver_assigned"
+  | "driver_arrived"
+  | "ongoing"
+  | "completed"
+  | "cancelled";
   date_time: string;
   payment_method?: string;
   createdAt: string;
@@ -92,10 +92,6 @@ export const getActiveRide = async (): Promise<Trip | null> => {
     const response = await api.get<Trip>("/driver-app/active-ride");
     return response.data;
   } catch (error: any) {
-    // If 404, no active ride
-    if (error.response?.status === 404) {
-      return null;
-    }
     throw new Error(getApiErrorMessage(error));
   }
 };

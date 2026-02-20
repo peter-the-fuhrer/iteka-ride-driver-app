@@ -74,7 +74,7 @@ export default function ActiveRide() {
   });
 
   const [routeInfo, setRouteInfo] = useState({
-    distance: "0 km",
+    distance: "0.00 km",
     duration: "0 min",
   });
   const [routeCoordinates, setRouteCoordinates] = useState<
@@ -84,7 +84,18 @@ export default function ActiveRide() {
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["45%", "80%"], []);
+  const snapPoints = useMemo(() => ["55%", "85%"], []);
+
+  // Auto-expand to show details
+  useEffect(() => {
+    if (bottomSheetRef.current) {
+      // Snap to second index (85%) for active ride details
+      const timer = setTimeout(() => {
+        bottomSheetRef.current?.snapToIndex(1);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [activeRide?.id, activeRide?.status]);
   const mapRef = useRef<MapboxMapRef>(null);
 
   // Fetch route from OpenRouteService
@@ -125,7 +136,7 @@ export default function ActiveRide() {
           // Extract distance and duration
           const distanceKm = (
             route.properties.segments[0].distance / 1000
-          ).toFixed(1);
+          ).toFixed(2);
           const durationMin = Math.ceil(
             route.properties.segments[0].duration / 60,
           );
@@ -143,7 +154,7 @@ export default function ActiveRide() {
         const fallbackCoords = [driverLocation, destination];
         console.log("Using fallback coords:", fallbackCoords);
         setRouteCoordinates(fallbackCoords);
-        setRouteInfo({ distance: "2.5 km", duration: "8 min" });
+        setRouteInfo({ distance: "2.50 km", duration: "8 min" });
       }
     };
 
@@ -275,7 +286,8 @@ export default function ActiveRide() {
             "The client has cancelled this ride.",
           type: "warning",
         });
-        // Very aggressive vibration for cancellation
+        // Stop any current ringing and play cancellation pattern
+        Vibration.cancel();
         Vibration.vibrate([
           0, 200, 100, 200, 100, 200, 100, 200, 100, 500, 100, 500, 100, 500,
         ]);
@@ -296,7 +308,8 @@ export default function ActiveRide() {
             "The client has cancelled this ride.",
           type: "warning",
         });
-        // Very aggressive vibration for cancellation
+        // Stop any current ringing and play cancellation pattern
+        Vibration.cancel();
         Vibration.vibrate([
           0, 200, 100, 200, 100, 200, 100, 200, 100, 500, 100, 500, 100, 500,
         ]);
@@ -425,12 +438,12 @@ export default function ActiveRide() {
                         historyRes.rides.map(mapTripToRideHistory),
                       );
                     }
-                  } catch (_) {}
+                  } catch (_) { }
                   router.replace("/(root)");
                 } catch (error: any) {
                   useAlertStore.getState().showAlert({
                     title: t("error") || "Error",
-                    message: error.message || "Could not complete trip",
+                    message: t(error.message, { defaultValue: error.message }),
                     type: "error",
                   });
                 }
@@ -443,7 +456,7 @@ export default function ActiveRide() {
     } catch (error: any) {
       useAlertStore.getState().showAlert({
         title: t("error") || "Error",
-        message: error.message || "Could not update ride status",
+        message: t(error.message, { defaultValue: error.message }),
         type: "error",
       });
     } finally {
@@ -472,12 +485,12 @@ export default function ActiveRide() {
                 if (historyRes?.rides?.length) {
                   setRideHistory(historyRes.rides.map(mapTripToRideHistory));
                 }
-              } catch (_) {}
+              } catch (_) { }
               router.replace("/(root)");
             } catch (error: any) {
               useAlertStore.getState().showAlert({
                 title: t("error") || "Error",
-                message: error.message || "Could not cancel trip",
+                message: t(error.message, { defaultValue: error.message }),
                 type: "error",
               });
             }
@@ -574,6 +587,7 @@ export default function ActiveRide() {
       <BottomSheet
         ref={bottomSheetRef}
         snapPoints={snapPoints}
+        index={1}
         handleIndicatorStyle={{ backgroundColor: Colors.gray[300] }}
         backgroundStyle={{ borderRadius: 24 }}
       >
@@ -598,9 +612,6 @@ export default function ActiveRide() {
               <View style={styles.customerInfo}>
                 <Text style={styles.customerName}>
                   {activeRide.customerName}
-                </Text>
-                <Text style={styles.customerRating}>
-                  ⭐ {activeRide.customerRating}
                 </Text>
               </View>
               <View style={styles.communicationButtons}>
@@ -702,7 +713,7 @@ export default function ActiveRide() {
             <View style={styles.verticalDivider} />
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>{t("distance")}</Text>
-              <Text style={styles.statValue}>{activeRide.distance} km</Text>
+              <Text style={styles.statValue}>{activeRide.distance.toFixed(2)} km</Text>
             </View>
           </View>
 
@@ -868,6 +879,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Poppins_700Bold",
     color: Colors.black,
+    textAlign: "center",
   },
   detailsSection: {
     marginBottom: 20,

@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Image,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Send, User, X } from "lucide-react-native";
@@ -26,6 +27,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { Colors } from "../../constants/Colors";
 import { useDriverStore } from "../../store/driverStore";
+import { API_BASE_URL } from "../../services/api";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -133,7 +135,18 @@ export const ChatBottomSheet = forwardRef<BottomSheetModal>((props, ref) => {
         <View style={styles.header}>
           <View style={styles.headerInfo}>
             <View style={styles.avatar}>
-              <User size={20} color={Colors.gray[500]} />
+              {activeRide?.customerImage ? (
+                <Image
+                  source={{
+                    uri: activeRide.customerImage.startsWith("http")
+                      ? activeRide.customerImage
+                      : `${API_BASE_URL.replace("/api", "")}${activeRide.customerImage}`,
+                  }}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                />
+              ) : (
+                <User size={20} color={Colors.gray[500]} />
+              )}
             </View>
             <View>
               <Text style={styles.customerName}>
@@ -290,7 +303,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 40 : 16,
+    paddingBottom: Platform.OS === "ios" ? 40 : 0,
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.gray[100],

@@ -68,7 +68,7 @@ export default function RideRequestCard({
       <View style={styles.tripSummary}>
         <Text style={styles.summaryText}>
           {t("min_total", { count: request.duration })} •{" "}
-          {t("km_total", { count: request.distance })}
+          {t("km_total", { distance: request.distance.toFixed(2) })}
         </Text>
       </View>
 
@@ -117,10 +117,6 @@ export default function RideRequestCard({
         <View style={styles.customerTextContainer}>
           <Text style={styles.customerName}>
             {request.customerName} ({t("rider")})
-          </Text>
-          <Text style={styles.ratingText}>
-            {request.customerRating}{" "}
-            <Star size={12} color={Colors.black} fill={Colors.black} />
           </Text>
         </View>
       </View>
@@ -296,6 +292,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: "Poppins_700Bold",
     color: Colors.black,
+    textAlign: "center",
   },
   timerSubtext: {
     position: "absolute",

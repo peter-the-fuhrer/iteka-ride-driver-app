@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as authService from "../services/auth";
 
 interface AuthState {
@@ -27,7 +28,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   error: null,
 
-  setDriver: (driver) => set({ driver, isAuthenticated: !!driver }),
+  setDriver: (driver) => {
+    set({ driver, isAuthenticated: !!driver });
+    if (driver) {
+      AsyncStorage.setItem("driverData", JSON.stringify(driver)).catch((err) =>
+        console.error("Error persisting driver data:", err),
+      );
+    }
+  },
   setToken: (token) => set({ token }),
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),

@@ -299,6 +299,7 @@ const styles = StyleSheet.create({
     color: "black",
     fontSize: 18,
     fontFamily: "Poppins_600SemiBold",
+    textAlign: "center",
   },
   eyeIcon: {
     padding: 4,

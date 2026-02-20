@@ -3,15 +3,14 @@
   "welcome": "Bienvenue",
   "login": "Connexion",
   "logout": "Déconnexion",
+  "logout_confirm": "Êtes-vous sûr de vouloir vous déconnecter ?",
   "skip": "Passer",
-
   "onboarding_slide1_title": "Commencez à gagner",
   "onboarding_slide1_desc": "Rejoignez Iteka Ride et commencez à gagner avec des horaires flexibles qui vous conviennent",
   "onboarding_slide2_title": "Acceptez des courses",
   "onboarding_slide2_desc": "Recevez des demandes de course et acceptez-les en un seul clic pour commencer à gagner",
   "onboarding_slide3_title": "Suivez vos gains",
   "onboarding_slide3_desc": "Surveillez vos gains et vos performances en temps réel avec des informations détaillées",
-
   "login_title": "Bon retour, Capitaine !",
   "login_subtitle": "Connectez-vous pour commencer à accepter des courses et gagner aujourd'hui",
   "enter_phone": "Entrez votre numéro de téléphone",
@@ -19,7 +18,6 @@
   "enter_email": "Entrez votre adresse email",
   "enter_password": "Entrez votre mot de passe",
   "forgot_pin": "Code PIN oublié ?",
-
   "go_online": "Passer en ligne",
   "going_online": "Connexion en cours...",
   "go_offline": "Passer hors ligne",
@@ -27,12 +25,10 @@
   "offline": "Hors ligne",
   "you_are_online": "Vous êtes en ligne",
   "you_are_offline": "Vous êtes hors ligne",
-
   "home": "Accueil",
   "earnings": "Gains",
   "history": "Historique",
   "profile": "Profil",
-
   "new_ride_request": "Nouvelle demande de course",
   "accept_ride": "Accepter la course",
   "decline": "Refuser",
@@ -42,7 +38,6 @@
   "start_trip": "Démarrer la course",
   "complete_trip": "Terminer la course",
   "cancel_trip": "Annuler la course",
-
   "customer_info": "Informations client",
   "customer": "Client",
   "pickup_location": "Lieu de prise en charge",
@@ -53,7 +48,6 @@
   "call": "Appeler",
   "chat": "Chat",
   "navigate": "Naviguer",
-
   "earnings_today": "Gains d'aujourd'hui",
   "total_rides": "Total des courses",
   "hours_online": "Heures en ligne",
@@ -66,12 +60,10 @@
   "average_fare": "Tarif moyen",
   "tips": "Pourboires",
   "cash_collected": "Espèces collectées",
-
   "ride_history": "Historique des courses",
   "no_rides_yet": "Aucune course pour le moment",
   "completed": "Terminée",
   "cancelled": "Annulée",
-
   "driver_profile": "Profil du chauffeur",
   "personal_info": "Informations personnelles",
   "vehicle_details": "Détails du véhicule",
@@ -93,7 +85,6 @@
   "language": "Langue",
   "notifications": "Notifications",
   "dark_mode": "Mode sombre",
-
   "min": "min",
   "km": "km",
   "away": "de distance",
@@ -103,7 +94,6 @@
   "error": "Erreur",
   "success": "Succès",
   "warning": "Avertissement",
-
   "alert_login_failed_title": "Échec de la connexion",
   "alert_login_failed_msg": "L'email ou le mot de passe que vous avez saisi est incorrect. Veuillez réessayer.",
   "alert_go_online_title": "Passer en ligne ?",
@@ -116,7 +106,6 @@
   "alert_cancel_trip_msg": "Êtes-vous sûr de vouloir annuler cette course ? Cela peut affecter votre évaluation.",
   "alert_complete_trip_title": "Terminer la course ?",
   "alert_complete_trip_msg": "Confirmez que le client est arrivé à destination.",
-
   "yes_go_online": "Oui, passer en ligne",
   "yes_go_offline": "Oui, passer hors ligne",
   "yes_accept": "Oui, accepter",
@@ -125,7 +114,6 @@
   "no_stay_offline": "Non, rester hors ligne",
   "no_stay_online": "Non, rester en ligne",
   "no_decline": "Non, refuser",
-
   "wallet": "Portefeuille",
   "available_balance": "Solde disponible",
   "cash_out": "Retirer",
@@ -147,13 +135,11 @@
   "vehicle_info": "Informations sur le véhicule",
   "email_support": "Support par email",
   "debt": "Dette",
-
   "time_online": "Temps en ligne",
   "completed_trips": "Courses terminées",
   "weekly_overview": "Vue hebdomadaire",
   "see_all": "Voir tout",
   "recent_trips": "Courses récentes",
-
   "cash_out_title": "Retirer",
   "trip_earning": "Gain de course",
   "commission": "Commission",
@@ -161,14 +147,12 @@
   "payout": "Retrait",
   "total_debt": "Dette totale",
   "debt_owed": "Dette due",
-
   "clear_all": "Tout effacer",
   "manage_documents_subtitle": "Gérez vos documents requis pour garder votre compte actif",
   "select_vehicle_subtitle": "Sélectionnez le véhicule que vous conduisez aujourd'hui",
   "rejected": "Rejeté",
   "approved": "Approuvé",
   "document_rejected_msg": "Document rejeté. Veuillez le re-télécharger",
-
   "status_accepted": "En route vers le point de prise en charge",
   "status_arrived": "Arrivé au point de prise en charge",
   "status_started": "Course en cours",
@@ -180,17 +164,16 @@
   "status_en_route": "En route",
   "status_request": "Demandée",
   "status_scheduled": "Planifiée",
-
+  "ride_cancelled": "Course annulée",
+  "ride_cancelled_by_client": "Le client a annulé cette course.",
   "driver_assigned": "Chauffeur assigné",
   "driver_arrived": "Arrivé au point de prise en charge",
   "ongoing": "En cours",
   "en_route": "En route",
   "request": "Demandée",
   "scheduled": "Planifiée",
-
   "pickup": "Prise en charge",
   "dropoff": "Destination",
-
   "driver_name_default": "Capitaine John Doe",
   "version": "Version",
   "action_required": "Action requise",
@@ -212,7 +195,7 @@
   "on_way": "En route",
   "destination_reached": "Destination atteinte",
   "min_total": "{{count}} min",
-  "km_total": "{{count}} km au total",
+  "km_total": "{{distance}} km au total",
   "no_active_ride": "Aucune course active",
   "trend_up_comparison": "+{{percent}}% par rapport à la semaine dernière",
   "no_recent_trips": "Aucune course récente",
@@ -244,5 +227,19 @@
   "server_error": "Erreur de serveur. Veuillez réessayer plus tard.",
   "dont_have_account": "Vous n'avez pas de compte ?",
   "sign_up": "S'inscrire",
-  "type_message": "Tapez un message..."
+  "type_message": "Tapez un message...",
+  "edit_profile": "Modifier le profil",
+  "help_center": "Centre d'aide",
+  "support_legal": "Support & Légal",
+  "change_password": "Changer le mot de passe",
+  "current_password": "Mot de passe actuel",
+  "new_password": "Nouveau mot de passe",
+  "confirm_new_password": "Confirmer le nouveau mot de passe",
+  "passwords_dont_match": "Les mots de passe ne correspondent pas",
+  "password_update_success": "Mot de passe mis à jour avec succès",
+  "password_update_error": "Échec de la mise à jour du mot de passe",
+  "connection_lost": "Connexion perdue",
+  "connection_lost_ride_msg": "La connexion est perdue. Si elle n'est pas rétablie bientôt, votre course pourrait être annulée.",
+  "ride_cancelled_connection_msg": "Votre course a été annulée en raison d'une perte prolongée de connexion.",
+  "camera_permission_required": "Désolé, nous avons besoin des permissions de la galerie pour que cela fonctionne !"
 }

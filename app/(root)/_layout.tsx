@@ -2,13 +2,41 @@ import { Tabs, Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Home, DollarSign, Clock, User } from "lucide-react-native";
 import { Platform, Image } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
 import { useAuthStore } from "../../store/authStore";
-import { API_BASE_URL } from "../../services/api";
+import api, { API_BASE_URL } from "../../services/api";
+import { useEffect } from "react";
+import { useDriverStore } from "../../store/driverStore";
 
 export default function RootLayout() {
   const { t } = useTranslation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const setUnreadCount = useDriverStore((s) => s.setUnreadNotificationsCount);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkNotifications = async () => {
+      try {
+        const response = await api.get("/notifications");
+        const filtered = response.data.filter(
+          (n: any) => n.target === "driver" || n.target === "all"
+        );
+        // This is a simple logic: show total count as unread if they haven't visited lately
+        // In a real app, you'd track 'lastReadAt' or 'read' status in DB
+        setUnreadCount(filtered.length);
+      } catch (err) {
+        console.error("Error checking notifications:", err);
+      }
+    };
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  const insets = useSafeAreaInsets();
 
   if (!isAuthenticated) {
     return <Redirect href="/auth/login" />;
@@ -24,8 +52,8 @@ export default function RootLayout() {
           backgroundColor: "white",
           borderTopWidth: 1,
           borderTopColor: "#f3f4f6",
-          height: Platform.OS === "android" ? 70 : 90,
-          paddingBottom: Platform.OS === "android" ? 10 : 30,
+          height: Platform.OS === "android" ? 60 + insets.bottom : 85 + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : (Platform.OS === "android" ? 10 : 30),
           paddingTop: 10,
         },
         tabBarLabelStyle: {
@@ -123,6 +151,12 @@ export default function RootLayout() {
       />
       <Tabs.Screen
         name="chat/index"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="change-password"
         options={{
           href: null,
         }}

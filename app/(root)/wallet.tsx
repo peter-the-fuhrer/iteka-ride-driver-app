@@ -60,7 +60,7 @@ export default function Wallet() {
             setRideHistory(historyRes.rides.map(mapTripToRideHistory));
           }
         }
-      } catch (_) {}
+      } catch (_) { }
       if (!cancelled) setLoading(false);
     })();
     return () => {
@@ -163,7 +163,7 @@ export default function Wallet() {
                       <Text style={styles.txType}>{t("cash_collected")}</Text>
                       <Text style={styles.txDate}>
                         {new Date(ride.date).toLocaleDateString()} •{" "}
-                        {ride.distance.toFixed(1)} km
+                        {ride.distance.toFixed(2)} km
                       </Text>
                     </View>
                   </View>

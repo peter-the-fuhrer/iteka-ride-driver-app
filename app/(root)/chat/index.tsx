@@ -9,6 +9,7 @@ import {
   FlatList,
   TextInput,
   Vibration,
+  Image,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Send, User, X } from "lucide-react-native";
@@ -22,7 +23,7 @@ import {
   sendMessage as sendSocketMessage,
   joinRideRoom,
 } from "../../../services/socket";
-import api from "../../../services/api";
+import api, { API_BASE_URL } from "../../../services/api";
 import { useAlertStore } from "../../../store/alertStore";
 import { useRef } from "react";
 
@@ -181,13 +182,30 @@ export default function ChatScreen() {
       <View style={styles.header}>
         <View style={styles.headerInfo}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (activeRide) {
+                router.replace("/(root)/active-ride");
+              } else {
+                router.back();
+              }
+            }}
             style={styles.backButton}
           >
             <X size={24} color={Colors.black} />
           </TouchableOpacity>
           <View style={styles.avatar}>
-            <User size={20} color={Colors.gray[500]} />
+            {activeRide?.customerImage ? (
+              <Image
+                source={{
+                  uri: activeRide.customerImage.startsWith("http")
+                    ? activeRide.customerImage
+                    : `${API_BASE_URL.replace("/api", "")}${activeRide.customerImage}`,
+                }}
+                style={{ width: 40, height: 40, borderRadius: 20 }}
+              />
+            ) : (
+              <User size={20} color={Colors.gray[500]} />
+            )}
           </View>
           <View>
             <Text style={styles.customerName}>

@@ -6,14 +6,13 @@ import {
   TouchableOpacity,
   Image,
   Switch,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import {
   User,
   Car,
-  FileText,
-  Settings as SettingsIcon,
   LogOut,
   ChevronRight,
   Shield,
@@ -21,6 +20,12 @@ import {
   Languages,
   Wallet,
   HelpCircle,
+  Star,
+  CheckCircle2,
+  AlertCircle,
+  Banknote,
+  Navigation,
+  History,
 } from "lucide-react-native";
 import { Colors } from "../../constants/Colors";
 import { useRouter } from "expo-router";
@@ -29,121 +34,62 @@ import { useAuthStore } from "../../store/authStore";
 import { useEffect, useState } from "react";
 import api, { API_BASE_URL } from "../../services/api";
 import * as ImagePicker from "expo-image-picker";
+import { useAlertStore } from "../../store/alertStore";
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { stats } = useDriverStore();
-  const { driver } = useAuthStore();
+  const { stats, rideHistory, unreadNotificationsCount } = useDriverStore();
+  const { driver, logout, setDriver } = useAuthStore();
   const [driverProfile, setDriverProfile] = useState<any>(null);
   const [documentsStatus, setDocumentsStatus] = useState<string>("");
 
-  // Fetch full driver profile with documents
   useEffect(() => {
     const fetchDriverProfile = async () => {
       if (!driver?._id) return;
       try {
-        // Try to get full driver profile - if endpoint doesn't exist, use driver from auth store
         const response = await api.get(`/drivers/${driver._id}`);
         setDriverProfile(response.data);
 
-        // Check document status
         const docs = response.data?.documents || {};
-        const hasAllDocs =
-          docs.id_card_front &&
-          docs.id_card_back &&
-          docs.license &&
-          docs.registration;
-        const hasSomeDocs =
-          docs.id_card_front ||
-          docs.id_card_back ||
-          docs.license ||
-          docs.registration;
+        const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
+        const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
 
         if (hasAllDocs) {
-          setDocumentsStatus(t("verified") || "Verified");
+          setDocumentsStatus("Verified");
         } else if (hasSomeDocs) {
-          setDocumentsStatus(t("pending") || "Pending");
+          setDocumentsStatus("Pending");
         } else {
-          setDocumentsStatus(t("action_required") || "Action Required");
+          setDocumentsStatus("Action Required");
         }
       } catch (error) {
-        // If endpoint doesn't exist or fails, use driver from auth store
         console.log("Could not fetch full profile, using auth store data");
         const docs = driver?.documents || {};
-        const hasAllDocs =
-          docs.id_card_front &&
-          docs.id_card_back &&
-          docs.license &&
-          docs.registration;
-        const hasSomeDocs =
-          docs.id_card_front ||
-          docs.id_card_back ||
-          docs.license ||
-          docs.registration;
+        const hasAllDocs = docs.id_card_front && docs.id_card_back && docs.license && docs.registration;
+        const hasSomeDocs = docs.id_card_front || docs.id_card_back || docs.license || docs.registration;
 
         if (hasAllDocs) {
-          setDocumentsStatus(t("verified") || "Verified");
+          setDocumentsStatus("Verified");
         } else if (hasSomeDocs) {
-          setDocumentsStatus(t("pending") || "Pending");
+          setDocumentsStatus("Pending");
         } else {
-          setDocumentsStatus(t("action_required") || "Action Required");
+          setDocumentsStatus("Action Required");
         }
       }
     };
     fetchDriverProfile();
   }, [driver?._id, t]);
 
-  const ProfileItem = ({
-    icon: Icon,
-    label,
-    value,
-    onPress,
-    isSwitch,
-    switchValue,
-    onValueChange,
-  }: any) => (
-    <TouchableOpacity
-      style={styles.profileItem}
-      onPress={onPress}
-      disabled={isSwitch}
-    >
-      <View style={styles.itemLeft}>
-        <View style={styles.iconWrapper}>
-          <Icon size={20} color={Colors.gray[600]} />
-        </View>
-        <View style={styles.itemLabelValueWrap}>
-          <Text style={styles.itemLabel}>{label}</Text>
-          {value ? (
-            <Text
-              style={styles.itemValue}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {value}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.itemRight}>
-        {isSwitch ? (
-          <Switch
-            value={switchValue}
-            onValueChange={onValueChange}
-            trackColor={{ false: Colors.gray[200], true: Colors.primary }}
-          />
-        ) : onPress ? (
-          <ChevronRight size={20} color={Colors.gray[400]} />
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-
   const handleAvatarPress = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      alert("Sorry, we need camera roll permissions to make this work!");
+      const { useAlertStore } = require("../../store/alertStore");
+      useAlertStore.getState().showAlert({
+        title: t("error") || "Error",
+        message: t("camera_permission_required") || "Sorry, we need camera roll permissions to make this work!",
+        type: "error",
+      });
       return;
     }
 
@@ -178,18 +124,23 @@ export default function Profile() {
 
       if (uploadRes.data.path) {
         const imagePath = uploadRes.data.path;
+        await api.put("/driver-app/profile", { profile_picture: imagePath });
 
-        await api.put("/driver-app/profile", {
-          profile_picture: imagePath,
-        });
+        if (imagePath) {
+          setDriver({ ...driver, profile_picture: imagePath } as any);
+        }
 
-        // Refresh profile
-        const response = await api.get(`/drivers/${driver._id}`);
+        const response = await api.get(`/drivers/${driver?._id}`);
         setDriverProfile(response.data);
       }
     } catch (error) {
       console.error("Error uploading profile picture:", error);
-      alert("Failed to upload profile picture");
+      const { useAlertStore } = require("../../store/alertStore");
+      useAlertStore.getState().showAlert({
+        title: t("error") || "Error",
+        message: "Failed to upload profile picture",
+        type: "error",
+      });
     }
   };
 
@@ -198,126 +149,231 @@ export default function Profile() {
     i18n.changeLanguage(nextLng);
   };
 
-  // Get vehicle display name
-  const getVehicleDisplay = () => {
-    if (driverProfile?.vehicle_plate) {
-      return driverProfile.vehicle_plate;
-    }
-    if (driver?.vehicle_plate) {
-      return driver.vehicle_plate;
-    }
-    if (driverProfile?.vehicle_type || driver?.vehicle_type) {
-      return (
-        (driverProfile?.vehicle_type || driver?.vehicle_type)
-          ?.charAt(0)
-          .toUpperCase() +
-        (driverProfile?.vehicle_type || driver?.vehicle_type)?.slice(1)
-      );
-    }
-    return t("no_vehicle") || "No Vehicle";
+  const handleLogout = () => {
+    useAlertStore.getState().showAlert({
+      title: t("logout") || "Logout",
+      message: t("logout_confirm") || "Are you sure you want to logout?",
+      type: "warning",
+      buttons: [
+        { text: t("cancel") || "Cancel", style: "cancel" },
+        {
+          text: t("logout") || "Logout",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/auth/login");
+          },
+        },
+      ],
+    });
   };
 
+  const getVehicleDisplay = () => {
+    if (driverProfile?.vehicle_plate || driver?.vehicle_plate) {
+      return driverProfile?.vehicle_plate || driver?.vehicle_plate;
+    }
+    return t("no_vehicle") || "No Vehicle Assigned";
+  };
+
+  const ProfileItem = ({
+    icon: Icon,
+    label,
+    value,
+    onPress,
+    isSwitch,
+    switchValue,
+    onValueChange,
+    isLast,
+    variant = "default",
+  }: any) => (
+    <TouchableOpacity
+      style={[styles.profileItem, isLast && styles.noBorder]}
+      onPress={onPress}
+      disabled={isSwitch}
+      activeOpacity={0.7}
+    >
+      <View style={styles.itemLeft}>
+        <View style={styles.iconWrapper}>
+          <Icon size={18} color={Colors.primary} />
+        </View>
+        <View>
+          <Text style={styles.itemLabel}>{label}</Text>
+          {value && !isSwitch && (
+            <Text style={styles.itemValueText}>{value}</Text>
+          )}
+        </View>
+      </View>
+      <View style={styles.itemRight}>
+        {isSwitch ? (
+          <Switch
+            value={switchValue}
+            onValueChange={onValueChange}
+            trackColor={{ false: "#E5E7EB", true: Colors.primary }}
+            thumbColor={"#fff"}
+          />
+        ) : onPress ? (
+          <ChevronRight size={18} color="#9CA3AF" />
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const Section = ({ title, children }: any) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionContent}>
+        {children}
+      </View>
+    </View>
+  );
+
+  const stats_data = [
+    { label: t("rating") || "Rating", value: (driverProfile?.rating || driver?.rating || 0).toFixed(1), icon: Star },
+    { label: t("trips") || "Trips", value: rideHistory.length || "0", icon: Navigation },
+    { label: t("balance") || "Balance", value: `${stats.netBalance.toLocaleString()} FBU`, icon: Banknote },
+  ];
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={[styles.topGradient, { height: insets.top + 180 }]} />
+
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>{t("profile")}</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Bell size={24} color={Colors.black} />
+        <TouchableOpacity
+          onPress={() => router.push("/notifications")}
+          style={styles.notifButton}
+        >
+          <View>
+            <Bell size={22} color="black" />
+            {unreadNotificationsCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarWrapper}>
-            <View style={styles.avatarPlaceholder}>
-              {driverProfile?.profile_picture || driver?.profile_picture ? (
-                <Image
-                  source={{
-                    uri: (
-                      driverProfile?.profile_picture || driver?.profile_picture
-                    ).startsWith("http")
-                      ? driverProfile?.profile_picture ||
-                        driver?.profile_picture
-                      : `${API_BASE_URL.replace("/api", "")}${driverProfile?.profile_picture || driver?.profile_picture}`,
-                  }}
-                  style={{ width: 100, height: 100, borderRadius: 50 }}
-                />
-              ) : (
-                <User size={40} color={Colors.gray[400]} />
-              )}
-            </View>
-            <TouchableOpacity
-              onPress={handleAvatarPress}
-              style={styles.editAvatar}
-            >
-              <Text style={styles.editAvatarText}>{t("edit")}</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+      >
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.cardHeader}>
+            <TouchableOpacity onPress={handleAvatarPress} style={styles.avatarContainer}>
+              <View style={styles.avatarPlaceholder}>
+                {driverProfile?.profile_picture || driver?.profile_picture ? (
+                  <Image
+                    source={{
+                      uri: (driverProfile?.profile_picture || driver?.profile_picture).startsWith("http")
+                        ? driverProfile?.profile_picture || driver?.profile_picture
+                        : `${API_BASE_URL.replace("/api", "")}${driverProfile?.profile_picture || driver?.profile_picture}`,
+                    }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <User size={40} color="white" />
+                )}
+              </View>
+              <View style={styles.editBadge}>
+                <Car color="white" size={10} />
+              </View>
             </TouchableOpacity>
+
+            <View style={styles.profileInfo}>
+              <Text style={styles.driverName}>
+                {driverProfile?.name || driver?.name || "Driver"}
+              </Text>
+              <View style={styles.statusRow}>
+                {driver?.status === "active" ? (
+                  <CheckCircle2 size={14} color={Colors.success} />
+                ) : (
+                  <AlertCircle size={14} color={Colors.warning} />
+                )}
+                <Text style={[styles.statusText, { color: driver?.status === "active" ? Colors.success : Colors.warning }]}>
+                  {driver?.status === "active" ? t("verified") : t("pending_verification")}
+                </Text>
+              </View>
+            </View>
           </View>
-          <Text style={styles.driverName}>
-            {driverProfile?.name || driver?.name || t("driver_name_default")}
-          </Text>
-          <Text style={styles.driverRating}>
-            ⭐ {(driverProfile?.rating || driver?.rating || 0).toFixed(1)} •{" "}
-            {driver?.status === "active" ? t("verified") : t("pending")}
-          </Text>
+
+          <View style={styles.statsRow}>
+            {stats_data.map((stat, index) => (
+              <View key={index} style={[styles.statItem, index < stats_data.length - 1 && styles.statDivider]}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Info Sections */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("account")}</Text>
+        {/* Account Section */}
+        <Section title={t("account")?.toUpperCase() || "ACCOUNT"}>
           <ProfileItem
             icon={User}
             label={t("personal_info")}
-            value={driverProfile?.name || driver?.name || ""}
+            value={driver?.phone || driver?.email}
+            onPress={() => { }}
           />
           <ProfileItem
             icon={Wallet}
             label={t("wallet")}
-            value={
-              stats.totalDebt > 0
-                ? `${t("debt") || "Debt"}: ${stats.totalDebt.toLocaleString()} FBU`
-                : `${stats.netBalance.toLocaleString()} FBU`
-            }
+            value={stats.totalDebt > 0 ? `${t("commission_owed")}: ${stats.totalDebt.toLocaleString()} FBU` : null}
             onPress={() => router.push("/wallet")}
+            isLast
           />
-        </View>
+        </Section>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("vehicle_info") || "Vehicle"}
-          </Text>
+        {/* Vehicle Section */}
+        <Section title={t("vehicle")?.toUpperCase() || "VEHICLE"}>
           <ProfileItem
             icon={Car}
-            label={t("my_vehicles")}
+            label={t("vehicle_info")}
             value={getVehicleDisplay()}
+            onPress={() => { }}
           />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("settings")}</Text>
           <ProfileItem
-            icon={HelpCircle}
-            label={t("support")}
-            onPress={() => router.push("/support")}
+            icon={Shield}
+            label={t("documents") || "Documents"}
+            value={documentsStatus}
+            onPress={() => { }}
+            isLast
           />
+        </Section>
+
+        {/* App Settings Section */}
+        <Section title={t("support_legal")?.toUpperCase()}>
           <ProfileItem
             icon={Languages}
             label={t("language")}
-            value={(i18n.language || "en").toUpperCase()}
+            value={i18n.language === "en" ? "English" : "Français"}
             onPress={toggleLanguage}
           />
-        </View>
+          <ProfileItem
+            icon={Bell}
+            label={t("notifications")}
+            isSwitch
+            switchValue={true}
+            onValueChange={() => { }}
+          />
+          <ProfileItem
+            icon={HelpCircle}
+            label={t("help_center")}
+            onPress={() => router.push("/support")}
+            isLast
+          />
+        </Section>
 
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() => router.replace("/auth/login")}
+          onPress={handleLogout}
         >
           <LogOut size={20} color={Colors.error} />
           <Text style={styles.logoutText}>{t("logout")}</Text>
         </TouchableOpacity>
-
-        <Text style={styles.versionText}>{t("version")} 1.0.0</Text>
       </ScrollView>
     </View>
   );
@@ -326,153 +382,243 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: "#F9FAFB",
+  },
+  topGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.primary,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
+    marginBottom: 20,
+    zIndex: 10,
   },
   headerTitle: {
-    fontSize: 24,
-    fontFamily: "Poppins_600SemiBold",
-    color: Colors.black,
+    fontSize: 22,
+    fontFamily: "Poppins_700Bold",
+    color: "black",
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  profileHeader: {
-    alignItems: "center",
-    paddingVertical: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
-  },
-  avatarWrapper: {
-    position: "relative",
-    marginBottom: 16,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.gray[50],
+  notifButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.4)",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.gray[100],
   },
-  editAvatar: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.white,
-  },
-  editAvatarText: {
-    fontSize: 10,
-    fontFamily: "Poppins_600SemiBold",
-    color: Colors.black,
-  },
-  driverName: {
-    fontSize: 20,
-    fontFamily: "Poppins_600SemiBold",
-    color: Colors.black,
-  },
-  driverRating: {
-    fontSize: 14,
-    fontFamily: "Poppins_500Medium",
-    color: Colors.gray[500],
-    marginTop: 4,
-  },
-  section: {
-    paddingTop: 24,
+  scrollContent: {
     paddingHorizontal: 20,
   },
-  sectionTitle: {
-    fontSize: 14,
+  profileCard: {
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  avatarContainer: {
+    position: "relative",
+  },
+  avatarPlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  avatarImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  editBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    backgroundColor: "black",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  profileInfo: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  driverName: {
+    fontSize: 18,
+    fontFamily: "Poppins_700Bold",
+    color: "#1F2937",
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 13,
     fontFamily: "Poppins_600SemiBold",
-    color: Colors.gray[400],
-    textTransform: "uppercase",
+    marginLeft: 6,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statDivider: {
+    borderRightWidth: 1,
+    borderRightColor: "#F3F4F6",
+  },
+  statValue: {
+    fontSize: 16,
+    fontFamily: "Poppins_700Bold",
+    color: "#1F2937",
+  },
+  statLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins_500Medium",
+    color: "#9CA3AF",
+    marginTop: 2,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontFamily: "Poppins_700Bold",
+    color: "#6B7280",
+    letterSpacing: 1,
     marginBottom: 12,
     marginLeft: 4,
+  },
+  sectionContent: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
   },
   profileItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: Colors.gray[50],
     padding: 16,
-    borderRadius: 16,
-    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  noBorder: {
+    borderBottomWidth: 0,
   },
   itemLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     flex: 1,
-  },
-  itemLabelValueWrap: {
-    flex: 1,
-    flexDirection: "column",
-    justifyContent: "center",
-    gap: 2,
-    minWidth: 0,
   },
   iconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.white,
-    justifyContent: "center",
+    width: 32,
+    height: 32,
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
   itemLabel: {
     fontSize: 15,
-    fontFamily: "Poppins_500Medium",
-    color: Colors.black,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#1F2937",
+  },
+  itemValueText: {
+    fontSize: 12,
+    fontFamily: "Poppins_400Regular",
+    color: "#6B7280",
+    marginTop: 1,
   },
   itemRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  itemValue: {
-    fontSize: 14,
-    fontFamily: "Poppins_400Regular",
-    color: Colors.gray[500],
-    marginTop: 2,
+    marginLeft: 8,
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    marginTop: 40,
-    marginHorizontal: 20,
+    marginTop: 12,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: "rgba(239, 68, 68, 0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.1)",
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: "rgba(239, 68, 68, 0.2)",
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Poppins_600SemiBold",
     color: Colors.error,
+    textAlign: "center",
+  },
+  footer: {
+    alignItems: "center",
+    marginTop: 24,
   },
   versionText: {
-    textAlign: "center",
-    marginTop: 24,
-    color: Colors.gray[400],
-    fontFamily: "Poppins_400Regular",
     fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    color: "#9CA3AF",
+  },
+  copyrightText: {
+    fontSize: 10,
+    fontFamily: "Poppins_400Regular",
+    color: "#D1D5DB",
+    marginTop: 4,
+  },
+  badge: {
+    position: "absolute",
+    right: -6,
+    top: -6,
+    backgroundColor: Colors.error,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 9,
+    fontFamily: "Poppins_700Bold",
   },
 });

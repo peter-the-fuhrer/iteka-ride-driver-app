@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface RideRequest {
   id: string;
@@ -70,9 +72,11 @@ interface DriverState {
   rideHistory: RideHistory[];
   stats: DriverStats;
   chatMessages: any[];
+  unreadNotificationsCount: number;
 
   // Actions
   setOnlineStatus: (status: boolean) => void;
+  setUnreadNotificationsCount: (count: number) => void;
   setCurrentLocation: (location: {
     latitude: number;
     longitude: number;
@@ -108,164 +112,181 @@ const initialStats: DriverStats = {
   weeklyData: [],
 };
 
-export const useDriverStore = create<DriverState>((set, get) => ({
-  isOnline: false,
-  currentLocation: null,
-  rideRequest: null,
-  activeRide: null,
-  rideHistory: [],
-  stats: initialStats,
-  chatMessages: [],
-
-  setOnlineStatus: (status) => set({ isOnline: status }),
-
-  setCurrentLocation: (location) => set({ currentLocation: location }),
-
-  setRideRequest: (request) => set({ rideRequest: request }),
-
-  acceptRide: () => {
-    const { rideRequest } = get();
-    if (rideRequest) {
-      set({
-        activeRide: { ...rideRequest, status: "accepted" },
-        rideRequest: null,
-      });
-    }
-  },
-
-  setActiveRide: (ride) => set({ activeRide: ride }),
-
-  setRideHistory: (rides) => set({ rideHistory: rides }),
-
-  declineRide: () => set({ rideRequest: null }),
-
-  updateRideStatus: (status) => {
-    const { activeRide } = get();
-    if (activeRide) {
-      const updates: Partial<ActiveRide> = { status };
-      if (status === "started") {
-        updates.startTime = new Date().toISOString();
-      }
-      set({ activeRide: { ...activeRide, ...updates } });
-    }
-  },
-
-  completeRide: (fare, rating) => {
-    const { activeRide, stats } = get();
-    if (activeRide) {
-      // Calculate commission (10% for now - will be from admin settings later)
-      const COMMISSION_RATE = 0.1;
-      const commission = Math.round(fare * COMMISSION_RATE);
-
-      const completedRide: RideHistory = {
-        id: activeRide.id,
-        date: new Date().toISOString(),
-        customerName: activeRide.customerName,
-        customerPhone: activeRide.customerPhone,
-        pickup: activeRide.pickupLocation.address,
-        dropoff: activeRide.dropoffLocation.address,
-        fare,
-        commission,
-        distance: activeRide.distance,
-        duration: activeRide.duration,
-        rating,
-        status: "completed",
-      };
-
-      const newTotalEarnings = stats.totalEarnings + fare;
-      const newTotalDebt = stats.totalDebt + commission;
-      const newNetBalance = newTotalEarnings - newTotalDebt;
-
-      set({
-        activeRide: null,
-        rideHistory: [completedRide, ...get().rideHistory],
-        stats: {
-          ...stats,
-          todayEarnings: stats.todayEarnings + fare,
-          todayRides: stats.todayRides + 1,
-          weeklyEarnings: stats.weeklyEarnings + fare,
-          monthlyEarnings: stats.monthlyEarnings + fare,
-          totalEarnings: newTotalEarnings,
-          totalDebt: newTotalDebt,
-          netBalance: newNetBalance,
-        },
-        chatMessages: [],
-      });
-    }
-  },
-
-  cancelRide: () => {
-    const { activeRide } = get();
-    if (activeRide) {
-      const cancelledRide: RideHistory = {
-        id: activeRide.id,
-        date: new Date().toISOString(),
-        customerName: activeRide.customerName,
-        customerPhone: activeRide.customerPhone,
-        pickup: activeRide.pickupLocation.address,
-        dropoff: activeRide.dropoffLocation.address,
-        fare: 0,
-        commission: 0,
-        distance: activeRide.distance,
-        duration: activeRide.duration,
-        status: "cancelled",
-      };
-
-      set({
-        activeRide: null,
-        rideHistory: [cancelledRide, ...get().rideHistory],
-        chatMessages: [],
-      });
-    }
-  },
-
-  addToHistory: (ride) => set({ rideHistory: [ride, ...get().rideHistory] }),
-
-  updateStats: (newStats) => set({ stats: { ...get().stats, ...newStats } }),
-
-  setChatMessages: (messages) => set({ chatMessages: messages }),
-
-  addChatMessage: (message) =>
-    set((state) => {
-      // 1. Check if exact message already exists
-      const exists = state.chatMessages.find(
-        (m) => m.id === message.id || (message._id && m.id === message._id),
-      );
-      if (exists) return state;
-
-      // 2. Check if this is a server confirmation of an optimistic message
-      const optimisticMatch = state.chatMessages.find(
-        (m) =>
-          m.id.startsWith("temp-") &&
-          m.text === message.text &&
-          m.sender === message.sender &&
-          Math.abs(
-            new Date(m.timestamp).getTime() -
-              new Date(message.timestamp).getTime(),
-          ) < 10000,
-      );
-
-      if (optimisticMatch) {
-        // Replace temp with real
-        return {
-          chatMessages: state.chatMessages.map((m) =>
-            m.id === optimisticMatch.id ? message : m,
-          ),
-        };
-      }
-
-      return { chatMessages: [...state.chatMessages, message] };
-    }),
-
-  clearChatMessages: () => set({ chatMessages: [] }),
-
-  reset: () =>
-    set({
+export const useDriverStore = create<DriverState>()(
+  persist(
+    (set, get) => ({
       isOnline: false,
+      currentLocation: null,
       rideRequest: null,
       activeRide: null,
       rideHistory: [],
       stats: initialStats,
       chatMessages: [],
+      unreadNotificationsCount: 0,
+
+      setOnlineStatus: (status) => set({ isOnline: status }),
+      setUnreadNotificationsCount: (count) => set({ unreadNotificationsCount: count }),
+
+      setCurrentLocation: (location) => set({ currentLocation: location }),
+
+      setRideRequest: (request) => set({ rideRequest: request }),
+
+      acceptRide: () => {
+        const { rideRequest } = get();
+        if (rideRequest) {
+          set({
+            activeRide: { ...rideRequest, status: "accepted" },
+            rideRequest: null,
+          });
+        }
+      },
+
+      setActiveRide: (ride) => set({ activeRide: ride }),
+
+      setRideHistory: (rides) => set({ rideHistory: rides }),
+
+      declineRide: () => set({ rideRequest: null }),
+
+      updateRideStatus: (status) => {
+        const { activeRide } = get();
+        if (activeRide) {
+          const updates: Partial<ActiveRide> = { status };
+          if (status === "started") {
+            updates.startTime = new Date().toISOString();
+          }
+          set({ activeRide: { ...activeRide, ...updates } });
+        }
+      },
+
+      completeRide: (fare, rating) => {
+        const { activeRide, stats } = get();
+        if (activeRide) {
+          // Calculate commission (10% for now - will be from admin settings later)
+          const COMMISSION_RATE = 0.1;
+          const commission = Math.round(fare * COMMISSION_RATE);
+
+          const completedRide: RideHistory = {
+            id: activeRide.id,
+            date: new Date().toISOString(),
+            customerName: activeRide.customerName,
+            customerPhone: activeRide.customerPhone,
+            pickup: activeRide.pickupLocation.address,
+            dropoff: activeRide.dropoffLocation.address,
+            fare,
+            commission,
+            distance: activeRide.distance,
+            duration: activeRide.duration,
+            rating,
+            status: "completed",
+          };
+
+          const newTotalEarnings = stats.totalEarnings + fare;
+          const newTotalDebt = stats.totalDebt + commission;
+          const newNetBalance = newTotalEarnings - newTotalDebt;
+
+          set({
+            activeRide: null,
+            rideHistory: [completedRide, ...get().rideHistory],
+            stats: {
+              ...stats,
+              todayEarnings: stats.todayEarnings + fare,
+              todayRides: stats.todayRides + 1,
+              weeklyEarnings: stats.weeklyEarnings + fare,
+              monthlyEarnings: stats.monthlyEarnings + fare,
+              totalEarnings: newTotalEarnings,
+              totalDebt: newTotalDebt,
+              netBalance: newNetBalance,
+            },
+            chatMessages: [],
+          });
+        }
+      },
+
+      cancelRide: () => {
+        const { activeRide } = get();
+        if (activeRide) {
+          const cancelledRide: RideHistory = {
+            id: activeRide.id,
+            date: new Date().toISOString(),
+            customerName: activeRide.customerName,
+            customerPhone: activeRide.customerPhone,
+            pickup: activeRide.pickupLocation.address,
+            dropoff: activeRide.dropoffLocation.address,
+            fare: 0,
+            commission: 0,
+            distance: activeRide.distance,
+            duration: activeRide.duration,
+            status: "cancelled",
+          };
+
+          set({
+            activeRide: null,
+            rideHistory: [cancelledRide, ...get().rideHistory],
+            chatMessages: [],
+          });
+        }
+      },
+
+      addToHistory: (ride) => set({ rideHistory: [ride, ...get().rideHistory] }),
+
+      updateStats: (newStats) => set({ stats: { ...get().stats, ...newStats } }),
+
+      setChatMessages: (messages) => set({ chatMessages: messages }),
+
+      addChatMessage: (message) =>
+        set((state) => {
+          // 1. Check if exact message already exists
+          const exists = state.chatMessages.find(
+            (m) => m.id === message.id || (message._id && m.id === message._id),
+          );
+          if (exists) return state;
+
+          // 2. Check if this is a server confirmation of an optimistic message
+          const optimisticMatch = state.chatMessages.find(
+            (m) =>
+              m.id.startsWith("temp-") &&
+              m.text === message.text &&
+              m.sender === message.sender &&
+              Math.abs(
+                new Date(m.timestamp).getTime() -
+                new Date(message.timestamp).getTime(),
+              ) < 10000,
+          );
+
+          if (optimisticMatch) {
+            // Replace temp with real
+            return {
+              chatMessages: state.chatMessages.map((m) =>
+                m.id === optimisticMatch.id ? message : m,
+              ),
+            };
+          }
+
+          return { chatMessages: [...state.chatMessages, message] };
+        }),
+
+      clearChatMessages: () => set({ chatMessages: [] }),
+
+      reset: () =>
+        set({
+          isOnline: false,
+          rideRequest: null,
+          activeRide: null,
+          rideHistory: [],
+          stats: initialStats,
+          chatMessages: [],
+        }),
     }),
-}));
+    {
+      name: "iteka-ride-driver-storage",
+      storage: createJSONStorage(() => AsyncStorage),
+      // Only persist essential state
+      partialize: (state) => ({
+        isOnline: state.isOnline,
+        activeRide: state.activeRide,
+        rideHistory: state.rideHistory,
+        stats: state.stats,
+      }),
+    },
+  ),
+);
