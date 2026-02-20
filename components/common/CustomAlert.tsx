@@ -70,6 +70,9 @@ export default function CustomAlert() {
   };
 
   const renderButton = (button: AlertButton, index: number) => {
+    const isVertical = [config.buttons || { length: 0 }].length >= 2 || (config.buttons && config.buttons.length >= 2);
+    // Simplified:
+    const showVertical = buttons.length >= 2;
     const isDestructive = button.style === "destructive";
     const isCancel = button.style === "cancel";
 
@@ -78,6 +81,7 @@ export default function CustomAlert() {
         key={index}
         style={[
           styles.button,
+          showVertical && { flex: 0, width: "100%" },
           isDestructive && styles.destructiveButton,
           isCancel && styles.cancelButton,
         ]}
@@ -126,7 +130,7 @@ export default function CustomAlert() {
           <View
             style={[
               styles.buttonContainer,
-              buttons.length > 2 && styles.verticalButtons,
+              buttons.length >= 2 && styles.verticalButtons,
             ]}
           >
             {buttons.map(renderButton)}
@@ -180,7 +184,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   verticalButtons: {
-    flexDirection: "column",
+    flexDirection: "column-reverse",
   },
   button: {
     flex: 1,

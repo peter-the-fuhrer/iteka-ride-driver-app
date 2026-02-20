@@ -538,7 +538,7 @@ export default function Home() {
         message: t("alert_go_online_msg"),
         type: "info",
         buttons: [
-          { text: t("cancel"), style: "cancel" },
+          { text: t("no_stay_offline"), style: "cancel" },
           {
             text: t("yes_go_online"),
             onPress: async () => {
@@ -581,7 +581,7 @@ export default function Home() {
       message: t("alert_go_offline_msg"),
       type: "warning",
       buttons: [
-        { text: t("cancel"), style: "cancel" },
+        { text: t("no_stay_online"), style: "cancel" },
         {
           text: t("yes_go_offline"),
           style: "destructive",

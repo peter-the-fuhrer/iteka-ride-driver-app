@@ -84,7 +84,7 @@ export default function ActiveRide() {
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["55%", "85%"], []);
+  const snapPoints = useMemo(() => ["65%", "90%"], []);
 
   // Auto-expand to show details
   useEffect(() => {
@@ -409,7 +409,7 @@ export default function ActiveRide() {
           message: t("alert_complete_trip_msg"),
           type: "success",
           buttons: [
-            { text: t("cancel"), style: "cancel" },
+            { text: t("no_stay_online"), style: "cancel" },
             {
               text: t("yes_complete"),
               onPress: async () => {
@@ -470,7 +470,7 @@ export default function ActiveRide() {
       message: t("alert_cancel_trip_msg"),
       type: "warning",
       buttons: [
-        { text: t("cancel"), style: "cancel" },
+        { text: t("no_stay_online"), style: "cancel" },
         {
           text: t("yes_cancel"),
           style: "destructive",
@@ -847,6 +847,7 @@ const styles = StyleSheet.create({
   },
   actionSection: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   cancelButton: {
@@ -858,14 +859,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mainActionButton: {
+    flexGrow: 1,
     flex: 1,
-    height: 60,
+    minWidth: 200,
+    minHeight: 60,
     backgroundColor: Colors.primary,
     borderRadius: 18,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -876,10 +881,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   mainActionButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Poppins_700Bold",
     color: Colors.black,
     textAlign: "center",
+    flexShrink: 1,
   },
   detailsSection: {
     marginBottom: 20,
