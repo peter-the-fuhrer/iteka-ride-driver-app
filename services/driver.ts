@@ -50,6 +50,8 @@ export interface Trip {
   payment_method?: string;
   createdAt: string;
   updatedAt: string;
+  eta?: number;
+  elapsed_time?: number;
 }
 
 // Update driver status (online/offline) and location
@@ -181,7 +183,7 @@ export function mapTripToRideRequest(trip: Trip): RideRequest {
     },
     estimatedFare: trip.price,
     distance: (trip.distance || 0) / 1000,
-    duration: Math.round((trip.distance || 0) / 500),
+    duration: trip.eta ?? Math.round((trip.distance || 0) / 500),
     requestTime: trip.createdAt ?? trip.date_time,
   };
 }
@@ -196,7 +198,7 @@ const statusMap = {
 export function mapTripToActiveRide(trip: Trip): ActiveRide {
   const base = mapTripToRideRequest(trip);
   const status = statusMap[trip.status as keyof typeof statusMap] ?? "accepted";
-  return { ...base, status };
+  return { ...base, status, elapsedTime: trip.elapsed_time };
 }
 
 export function mapTripToRideHistory(trip: Trip): RideHistory {

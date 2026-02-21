@@ -82,6 +82,37 @@ export default function ActiveRide() {
   >([]);
   const [carHeading, setCarHeading] = useState(0); // Car rotation angle
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(activeRide?.elapsedTime || 0);
+
+  // Sync with backend elapsedTime when ride data updates
+  useEffect(() => {
+    if (activeRide?.elapsedTime !== undefined) {
+      setElapsedSeconds(activeRide.elapsedTime);
+    }
+  }, [activeRide?.elapsedTime]);
+
+  // Increment timer if ride is started
+  useEffect(() => {
+    let interval: any;
+    if (activeRide?.status === "started") {
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [activeRide?.status]);
+
+  const formatElapsed = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`;
+    }
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
 
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["65%", "90%"], []);
@@ -143,7 +174,7 @@ export default function ActiveRide() {
 
           setRouteInfo({
             distance: `${distanceKm} km`,
-            duration: `${durationMin} min`,
+            duration: activeRide.duration ? `${activeRide.duration} min` : `${durationMin} min`,
           });
         } else {
           console.log("No features in response");
@@ -565,7 +596,9 @@ export default function ActiveRide() {
 
         {/* Nav Info Pill */}
         <View style={styles.navPill}>
-          <Text style={styles.navTime}>{routeInfo.duration}</Text>
+          <Text style={styles.navTime}>
+            {activeRide.duration ? `${activeRide.duration} ${t("min")}` : routeInfo.duration}
+          </Text>
           <Text style={styles.navDist}>{routeInfo.distance}</Text>
         </View>
 
@@ -613,6 +646,11 @@ export default function ActiveRide() {
                 <Text style={styles.customerName}>
                   {activeRide.customerName}
                 </Text>
+                {activeRide.status === "started" && (
+                  <Text style={styles.tripTimer}>
+                    {t("trip_duration")}: {formatElapsed(elapsedSeconds)}
+                  </Text>
+                )}
               </View>
               <View style={styles.communicationButtons}>
                 <TouchableOpacity
@@ -822,6 +860,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Poppins_700Bold",
     color: Colors.black,
+  },
+  tripTimer: {
+    fontSize: 13,
+    fontFamily: "Poppins_500Medium",
+    color: Colors.primary,
+    marginBottom: 2,
   },
   customerRating: {
     fontSize: 14,

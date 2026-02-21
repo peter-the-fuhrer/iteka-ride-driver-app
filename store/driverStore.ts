@@ -28,6 +28,7 @@ export interface ActiveRide extends RideRequest {
   startTime?: string;
   endTime?: string;
   actualFare?: number;
+  elapsedTime?: number; // Backend provided elapsed time in seconds
 }
 
 export interface RideHistory {
